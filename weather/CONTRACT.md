@@ -30,7 +30,7 @@ Notes:
 - Availability (LWT): `<prefix>/<site_id>/availability` with `online`/`offline`.
  - Convenience topics for HA sensors:
    - Hourly "now" metrics at `<prefix>/<site_id>/hourly/<metric>` with payload `{ts_utc, value}`
-   - Daily single-values at `<prefix>/<site_id>/daily/{today|tomorrow}/<metric>` with payload `{date_utc, value}` (retained)
+   - Daily single-values at `<prefix>/<site_id>/daily/{today|tomorrow}/<metric>` with payload `{date_utc, value}` (retained). Metrics include: `ghi_daily_total_mj_m2`, `sunshine_duration_s`, `precip_day_total_mm`, `temp_day_max_c`, `cloud_cover_day_mean_pct`.
 
 ## Log Files and Layout
 - Directory: `/data/logs/`

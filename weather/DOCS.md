@@ -55,4 +55,4 @@ Autodiscovery
 - Enable via `ha_discovery_enabled: true` (default).
 - Sensors published (extended set):
   - Hourly now: GHI, DNI, DHI (W/m²), k_GHI, Sun Elevation (°), Sun Azimuth (°), Cloud Cover (%), Temp 2m (°C), Wind 10m (m/s), Precip (mm), Precip Prob (%)
-  - Daily (single-value): Today/Tomorrow GHI total (MJ/m²), Sunshine (s), Precip total (mm), Temp Max (°C)
+  - Daily (single-value): Today/Tomorrow GHI total (MJ/m²), Sunshine (s), Precip total (mm), Temp Max (°C), Cloud Cover Mean (%)

@@ -19,7 +19,7 @@ def setup_logging(level: str = "INFO"):
 
 def main() -> int:
     setup_logging("INFO")
-    logging.info("🌦️  Weather Add-on starting (v0.1.1)")
+    logging.info("🌦️  Weather Add-on starting (v0.1.2)")
 
     try:
         config = get_config()
@@ -231,6 +231,7 @@ def main() -> int:
                         publish(f"daily/{prefix}/sunshine_duration_s", {"date_utc": d["date_utc"], "value": d.get("sunshine_duration_s", 0.0)}, retain=True)
                         publish(f"daily/{prefix}/precip_day_total_mm", {"date_utc": d["date_utc"], "value": d.get("precip_day_total_mm", 0.0)}, retain=True)
                         publish(f"daily/{prefix}/temp_day_max_c", {"date_utc": d["date_utc"], "value": d.get("temp_day_max_c", 0.0)}, retain=True)
+                        publish(f"daily/{prefix}/cloud_cover_day_mean_pct", {"date_utc": d["date_utc"], "value": d.get("cloud_cover_day_mean_pct", 0.0)}, retain=True)
                     pub_day("today", d_today)
                     pub_day("tomorrow", d_tom)
                 except Exception as e:

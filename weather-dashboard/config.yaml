@@ -1,5 +1,5 @@
 name: "Weather Dashboard"
-version: "0.1.0"
+version: "0.1.1"
 slug: "weather-dashboard"
 description: "Ingress UI for displaying weather and forecast from MQTT topics published by the Weather add-on"
 arch:
@@ -37,4 +37,3 @@ schema:
   site_id: str
   tz: str?
   log_level: list(debug|info|warning|error|critical)?
-

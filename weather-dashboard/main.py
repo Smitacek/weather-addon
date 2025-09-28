@@ -87,6 +87,8 @@ INDEX_HTML = """
       td.key { color: #aaa; width: 60%; }
       td.val { text-align: right; }
       small { color: #888; }
+      .icon { display: flex; align-items: center; justify-content: center; margin-bottom: 8px; }
+      canvas { width: 100%; height: 180px; background: #161616; border-radius: 6px; border: 1px solid #2a2a2a; }
     </style>
   </head>
   <body>
@@ -97,25 +99,92 @@ INDEX_HTML = """
       <div class="grid">
         <div class="card">
           <h2>Now</h2>
+          <div id="now-icon" class="icon"></div>
           <table id="now-table"></table>
           <small id="now-ts"></small>
         </div>
         <div class="card">
           <h2>Today</h2>
+          <div id="today-icon" class="icon"></div>
           <table id="today-table"></table>
         </div>
         <div class="card">
           <h2>Tomorrow</h2>
+          <div id="tomorrow-icon" class="icon"></div>
           <table id="tomorrow-table"></table>
         </div>
         <div class="card">
           <h2>Daily GHI (MJ/m²)</h2>
+          <canvas id="series-canvas" width="640" height="180"></canvas>
           <table id="series-table"></table>
         </div>
       </div>
     </div>
     <script>
       const fmt = (v) => (v === null || v === undefined) ? '-' : (typeof v === 'number' ? v.toFixed(2) : String(v));
+
+      function iconSvg(kind) {
+        // Minimal inline SVGs: clear, partly, cloudy, rain
+        if (kind === 'clear') {
+          return `<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="32" cy="32" r="14" fill="#FDB813"/>
+            <g stroke="#FDB813" stroke-width="3">
+              <line x1="32" y1="6" x2="32" y2="16"/>
+              <line x1="32" y1="48" x2="32" y2="58"/>
+              <line x1="6" y1="32" x2="16" y2="32"/>
+              <line x1="48" y1="32" x2="58" y2="32"/>
+              <line x1="12" y1="12" x2="19" y2="19"/>
+              <line x1="45" y1="45" x2="52" y2="52"/>
+              <line x1="12" y1="52" x2="19" y2="45"/>
+              <line x1="45" y1="19" x2="52" y2="12"/>
+            </g>
+          </svg>`;
+        }
+        if (kind === 'partly') {
+          return `<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="22" cy="22" r="10" fill="#FDB813"/>
+            <ellipse cx="38" cy="38" rx="16" ry="10" fill="#9AA4AD"/>
+            <ellipse cx="26" cy="40" rx="12" ry="8" fill="#B3BDC6"/>
+          </svg>`;
+        }
+        if (kind === 'cloudy') {
+          return `<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="38" cy="36" rx="18" ry="12" fill="#9AA4AD"/>
+            <ellipse cx="24" cy="40" rx="14" ry="10" fill="#B3BDC6"/>
+          </svg>`;
+        }
+        // rain
+        return `<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="38" cy="28" rx="18" ry="12" fill="#9AA4AD"/>
+          <ellipse cx="24" cy="32" rx="14" ry="10" fill="#B3BDC6"/>
+          <g stroke="#4FC3F7" stroke-width="3">
+            <line x1="22" y1="44" x2="18" y2="56"/>
+            <line x1="32" y1="46" x2="28" y2="58"/>
+            <line x1="42" y1="44" x2="38" y2="56"/>
+          </g>
+        </svg>`;
+      }
+
+      function classifyNow(now) {
+        const cc = now.cloud_cover_pct?.value ?? null;
+        const pr = now.precip_probability_pct?.value ?? null;
+        const pm = now.precip_mm?.value ?? null;
+        if ((pm !== null && pm > 0.1) || (pr !== null && pr >= 50)) return 'rain';
+        if (cc === null) return 'cloudy';
+        if (cc < 20) return 'clear';
+        if (cc < 60) return 'partly';
+        return 'cloudy';
+      }
+
+      function classifyDay(day) {
+        const pm = day.precip_day_total_mm?.value ?? null;
+        const cc = day.cloud_cover_day_mean_pct?.value ?? null;
+        if (pm !== null && pm > 0.1) return 'rain';
+        if (cc === null) return 'cloudy';
+        if (cc < 20) return 'clear';
+        if (cc < 60) return 'partly';
+        return 'cloudy';
+      }
       function renderNow(now) {
         const keys = [
           ['ghi_w_m2', 'GHI (W/m²)'],
@@ -163,6 +232,29 @@ INDEX_HTML = """
         (series || []).forEach(row => {
           el.innerHTML += `<tr><td class="key">${row.date_utc}</td><td class="val">${fmt(row.value)}</td></tr>`;
         });
+        // draw simple bar chart
+        const canvas = document.getElementById('series-canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        const W = canvas.width; const H = canvas.height; const pad = 24;
+        const data = (series || []).map(s => +s.value || 0);
+        if (!data.length) return;
+        const maxV = Math.max(...data) || 1;
+        const barW = (W - pad*2) / data.length;
+        ctx.strokeStyle = '#333';
+        ctx.strokeRect(0.5, 0.5, W-1, H-1);
+        ctx.fillStyle = '#4FC3F7';
+        data.forEach((v, i) => {
+          const h = (H - pad*2) * (v / maxV);
+          const x = pad + i * barW + 2;
+          const y = H - pad - h;
+          ctx.fillRect(x, y, Math.max(2, barW - 4), h);
+        });
+        // axes labels (min)
+        ctx.fillStyle = '#aaa';
+        ctx.font = '12px sans-serif';
+        ctx.fillText('0', 4, H - pad + 12);
+        ctx.fillText(maxV.toFixed(1), 4, pad);
       }
       async function refresh() {
         try {
@@ -170,9 +262,18 @@ INDEX_HTML = """
             fetch('api/now').then(r => r.json()),
             fetch('api/daily').then(r => r.json()),
           ]);
-          renderNow(now.now || {});
-          renderDay('today-table', daily.today || {});
-          renderDay('tomorrow-table', daily.tomorrow || {});
+          const nowMap = now.now || {};
+          renderNow(nowMap);
+          const nowIcon = iconSvg(classifyNow(nowMap));
+          document.getElementById('now-icon').innerHTML = nowIcon;
+
+          const dToday = daily.today || {};
+          renderDay('today-table', dToday);
+          document.getElementById('today-icon').innerHTML = iconSvg(classifyDay(dToday));
+
+          const dTom = daily.tomorrow || {};
+          renderDay('tomorrow-table', dTom);
+          document.getElementById('tomorrow-icon').innerHTML = iconSvg(classifyDay(dTom));
           renderSeries(daily.series || []);
         } catch (e) { console.error(e); }
       }
@@ -186,4 +287,3 @@ INDEX_HTML = """
 
 if __name__ == "__main__":
     main()
-

@@ -1,5 +1,5 @@
 name: "Weather Add-on"
-version: "0.1.1"
+version: "0.1.2"
 slug: "weather"
 description: "Weather + solar forecast skeleton for PV yield optimization (structure based on bms-reader-addon)"
 arch:
