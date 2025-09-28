@@ -1,0 +1,106 @@
+name: "Weather Add-on"
+version: "0.1.1"
+slug: "weather"
+description: "Weather + solar forecast skeleton for PV yield optimization (structure based on bms-reader-addon)"
+arch:
+  - armhf
+  - aarch64
+  - amd64
+init: false
+startup: application
+boot: manual
+stage: experimental
+homeassistant: "2023.1.0"
+url: "https://example.com/weather-addon"
+
+options:
+  # Location & site identity
+  site_id: "default"             # used in MQTT topics and logs
+  latitude: 0.0
+  longitude: 0.0
+  elevation_m: 0.0
+  timezone: "UTC"
+
+  # Provider & model
+  provider: "open-meteo"         # e.g., open-meteo, openweathermap
+  provider_model: "auto"          # provider-specific model (if applicable)
+  api_key: ""
+  units: "metric"                # metric|imperial
+
+  # PV system parameters (for derived POA and yield)
+  pv_capacity_kw: 3.0             # DC STC capacity
+  tilt_deg: 35.0
+  albedo: 0.20
+  gamma_p_pct_per_c: -0.4         # power temperature coeff (%/°C)
+  noct_cell_temp_c: 45.0          # nominal cell temp at 800 W/m², 20°C, 1 m/s
+  inverter_ac_limit_kw: 3.0
+
+  # Forecast horizon & cadence
+  forecast_days: 7                # daily horizon
+  hourly_horizon_h: 72            # hourly horizon
+  nowcast_enabled: false
+  nowcast_step_s: 900             # 5–15 min typical
+
+  # Update & logging
+  update_interval: 300
+  log_level: info
+  log_raw: true                   # store raw provider features
+  log_features: true              # store derived PV features
+  log_retention_days: 90
+  log_format: "jsonl"             # jsonl|csv|parquet (jsonl implemented first)
+  data_version: "1.0"
+
+  # MQTT publication
+  mqtt_enabled: true
+  mqtt_host: "core-mosquitto"
+  mqtt_port: 1883
+  mqtt_username: ""
+  mqtt_password: ""
+  mqtt_topic_prefix: "weather"
+  ha_discovery_enabled: true
+
+schema:
+  # Identity & location
+  site_id: str?
+  latitude: float
+  longitude: float
+  elevation_m: float?
+  timezone: str?
+
+  # Provider
+  provider: list(open-meteo|openweathermap)?
+  provider_model: str?
+  api_key: str?
+  units: list(metric|imperial)?
+
+  # PV system
+  pv_capacity_kw: float?
+  tilt_deg: float?
+  albedo: float?
+  gamma_p_pct_per_c: float?
+  noct_cell_temp_c: float?
+  inverter_ac_limit_kw: float?
+
+  # Horizons & cadence
+  forecast_days: int(1,14)?
+  hourly_horizon_h: int(1,168)?
+  nowcast_enabled: bool?
+  nowcast_step_s: int(60,1800)?
+  update_interval: int(60,3600)
+
+  # Logging
+  log_level: list(debug|info|warning|error|critical)?
+  log_raw: bool?
+  log_features: bool?
+  log_retention_days: int(1,365)?
+  log_format: list(jsonl|csv|parquet)?
+  data_version: str?
+
+  # MQTT
+  mqtt_enabled: bool?
+  mqtt_host: str?
+  mqtt_port: port?
+  mqtt_username: str?
+  mqtt_password: password?
+  mqtt_topic_prefix: str?
+  ha_discovery_enabled: bool?

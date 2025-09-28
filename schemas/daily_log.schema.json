@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Weather Daily Record",
+  "type": "object",
+  "required": [
+    "date_utc",
+    "provider",
+    "site_id",
+    "latitude",
+    "longitude",
+    "timezone",
+    "data_version"
+  ],
+  "properties": {
+    "date_utc": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "provider": { "type": "string" },
+    "provider_model": { "type": "string" },
+    "site_id": { "type": "string" },
+    "latitude": { "type": "number" },
+    "longitude": { "type": "number" },
+    "elevation_m": { "type": "number" },
+    "timezone": { "type": "string" },
+    "data_version": { "type": "string" },
+
+    "sunrise": { "type": "string", "format": "date-time" },
+    "sunset": { "type": "string", "format": "date-time" },
+    "day_length_s": { "type": "number", "minimum": 0 },
+
+    "sunshine_duration_s": { "type": "number", "minimum": 0 },
+    "ghi_daily_total_mj_m2": { "type": "number", "minimum": 0 },
+    "poa_daily_total_mj_m2": { "type": "number", "minimum": 0 },
+    "temp_day_max_c": { "type": "number" },
+    "temp_day_min_c": { "type": "number" },
+    "cloud_cover_day_mean_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+    "precip_day_total_mm": { "type": "number", "minimum": 0 },
+    "wind_day_max_ms": { "type": "number", "minimum": 0 },
+
+    "pv_yield_dc_kwh": { "type": "number", "minimum": 0 },
+    "pv_yield_ac_kwh": { "type": "number", "minimum": 0 },
+
+    "pv_capacity_kw": { "type": "number", "minimum": 0 },
+    "tilt_deg": { "type": "number" },
+    
+    "albedo": { "type": "number" },
+    "gamma_p_pct_per_c": { "type": "number" },
+    "noct_cell_temp_c": { "type": "number" },
+    "inverter_ac_limit_kw": { "type": "number", "minimum": 0 },
+
+    "source_quality": { "type": "string" },
+    "missing_fields": { "type": "array", "items": { "type": "string" } },
+    "filled_by": { "type": "string" },
+    "run_id": { "type": "string" }
+  },
+  "additionalProperties": true
+}

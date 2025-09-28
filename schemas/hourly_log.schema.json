@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Weather Hourly Record",
+  "type": "object",
+  "required": [
+    "ts_utc",
+    "provider",
+    "site_id",
+    "latitude",
+    "longitude",
+    "timezone",
+    "data_version"
+  ],
+  "properties": {
+    "ts_utc": { "type": "string", "format": "date-time" },
+    "provider": { "type": "string" },
+    "provider_model": { "type": "string" },
+    "site_id": { "type": "string" },
+    "latitude": { "type": "number" },
+    "longitude": { "type": "number" },
+    "elevation_m": { "type": "number" },
+    "timezone": { "type": "string" },
+    "data_version": { "type": "string" },
+    "lead_time_min": { "type": "integer", "minimum": 0, "maximum": 4320 },
+    "forecast_hour": { "type": "integer", "minimum": 0, "maximum": 168 },
+
+    "sun_elevation_deg": { "type": "number" },
+    "sun_azimuth_deg": { "type": "number" },
+    "sun_zenith_deg": { "type": "number" },
+
+    "ghi_w_m2": { "type": "number", "minimum": 0 },
+    "dni_w_m2": { "type": "number", "minimum": 0 },
+    "dhi_w_m2": { "type": "number", "minimum": 0 },
+    "shortwave_radiation_w_m2": { "type": "number", "minimum": 0 },
+
+    "ghi_cs_w_m2": { "type": "number", "minimum": 0 },
+    "dni_cs_w_m2": { "type": "number", "minimum": 0 },
+    "dhi_cs_w_m2": { "type": "number", "minimum": 0 },
+    "k_ghi": { "type": "number" },
+    "k_dni": { "type": "number" },
+
+    "poa_global_w_m2": { "type": "number", "minimum": 0 },
+    "poa_direct_w_m2": { "type": "number", "minimum": 0 },
+    "poa_diffuse_w_m2": { "type": "number", "minimum": 0 },
+
+    "sunshine_duration_s_hour": { "type": "number", "minimum": 0, "maximum": 3600 },
+
+    "temp_2m_c": { "type": "number" },
+    "dew_point_c": { "type": "number" },
+    "relative_humidity_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+    "wind_speed_10m_ms": { "type": "number", "minimum": 0 },
+    "wind_gust_10m_ms": { "type": "number", "minimum": 0 },
+    "wind_dir_10m_deg": { "type": "number", "minimum": 0, "maximum": 360 },
+    "precip_mm": { "type": "number", "minimum": 0 },
+    "precip_probability_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+    "mslp_hpa": { "type": "number" },
+    "visibility_m": { "type": "number", "minimum": 0 },
+
+    "t_cell_c": { "type": "number" },
+    "p_dc_kw": { "type": "number", "minimum": 0 },
+    "p_ac_kw": { "type": "number", "minimum": 0 },
+
+    "pv_capacity_kw": { "type": "number", "minimum": 0 },
+    "tilt_deg": { "type": "number" },
+    
+    "albedo": { "type": "number" },
+    "gamma_p_pct_per_c": { "type": "number" },
+    "noct_cell_temp_c": { "type": "number" },
+    "inverter_ac_limit_kw": { "type": "number", "minimum": 0 },
+
+    "source_quality": { "type": "string" },
+    "missing_fields": { "type": "array", "items": { "type": "string" } },
+    "filled_by": { "type": "string" },
+    "run_id": { "type": "string" }
+  },
+  "additionalProperties": true
+}
