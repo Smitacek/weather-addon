@@ -1,0 +1,4 @@
+name: "Weather Add-on Repository"
+url: "https://github.com/Smitacek/weather-addon"
+maintainer: "Smitacek"
+description: "Weather and solar forecast add-on for Home Assistant"
