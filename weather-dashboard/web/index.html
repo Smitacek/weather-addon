@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather & Solar Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            color: #2d3748;
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .status {
+            margin-left: auto;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .status.online {
+            background: #48bb78;
+            color: white;
+        }
+
+        .status.offline {
+            background: #f56565;
+            color: white;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+        }
+
+        .widget {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .widget:hover {
+            transform: translateY(-5px);
+        }
+
+        .widget-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .weather-current {
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+        }
+
+        .weather-icon {
+            font-size: 64px;
+        }
+
+        .temperature {
+            font-size: 48px;
+            font-weight: 300;
+            color: #2d3748;
+        }
+
+        .weather-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .detail-item {
+            padding: 10px;
+            background: #f7fafc;
+            border-radius: 8px;
+        }
+
+        .detail-label {
+            font-size: 12px;
+            color: #718096;
+            text-transform: uppercase;
+        }
+
+        .detail-value {
+            font-size: 20px;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .forecast-container {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding-bottom: 10px;
+        }
+
+        .forecast-day {
+            min-width: 100px;
+            text-align: center;
+            padding: 15px 10px;
+            background: #f7fafc;
+            border-radius: 10px;
+            transition: background 0.3s ease;
+        }
+
+        .forecast-day:hover {
+            background: #edf2f7;
+        }
+
+        .forecast-date {
+            font-size: 12px;
+            color: #718096;
+            margin-bottom: 10px;
+        }
+
+        .forecast-icon {
+            font-size: 32px;
+            margin: 10px 0;
+        }
+
+        .forecast-temp {
+            font-size: 14px;
+            color: #2d3748;
+        }
+
+        .forecast-temp-max {
+            font-weight: 600;
+        }
+
+        .forecast-temp-min {
+            color: #718096;
+        }
+
+        .solar-chart {
+            height: 200px;
+            margin-top: 20px;
+            background: #f7fafc;
+            border-radius: 10px;
+            padding: 15px;
+            position: relative;
+        }
+
+        .chart-label {
+            position: absolute;
+            top: 10px;
+            left: 15px;
+            font-size: 12px;
+            color: #718096;
+        }
+
+        .pv-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .metric {
+            text-align: center;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+            color: white;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        .hourly-forecast {
+            display: flex;
+            gap: 15px;
+            overflow-x: auto;
+            padding: 15px 0;
+        }
+
+        .hour-item {
+            min-width: 80px;
+            text-align: center;
+            padding: 10px;
+            background: #f7fafc;
+            border-radius: 8px;
+        }
+
+        .hour-time {
+            font-size: 12px;
+            color: #718096;
+        }
+
+        .hour-temp {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2d3748;
+            margin: 5px 0;
+        }
+
+        .hour-rain {
+            font-size: 11px;
+            color: #4299e1;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .pv-metrics {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                ☀️ Weather & Solar Dashboard
+                <span class="status online" id="connectionStatus">Online</span>
+            </h1>
+        </div>
+
+        <div class="dashboard-grid">
+            <!-- Current Weather Widget -->
+            <div class="widget">
+                <h2 class="widget-title">🌤️ Current Weather</h2>
+                <div class="weather-current">
+                    <div class="weather-icon">☀️</div>
+                    <div class="temperature">24°C</div>
+                </div>
+                <div class="weather-details">
+                    <div class="detail-item">
+                        <div class="detail-label">Feels Like</div>
+                        <div class="detail-value">22°C</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Humidity</div>
+                        <div class="detail-value">65%</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Wind</div>
+                        <div class="detail-value">12 km/h</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Pressure</div>
+                        <div class="detail-value">1013 hPa</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Solar Production Widget -->
+            <div class="widget">
+                <h2 class="widget-title">⚡ Solar Production</h2>
+                <div class="pv-metrics">
+                    <div class="metric">
+                        <div class="metric-value" id="pvPower">2.4 kW</div>
+                        <div class="metric-label">Current Power</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="pvToday">15.2 kWh</div>
+                        <div class="metric-label">Today</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="pvForecast">18.5 kWh</div>
+                        <div class="metric-label">Forecast</div>
+                    </div>
+                </div>
+                <div class="solar-chart" id="solarChart">
+                    <span class="chart-label">Production Today</span>
+                    <canvas id="productionChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Hourly Forecast Widget -->
+            <div class="widget">
+                <h2 class="widget-title">⏰ Next 24 Hours</h2>
+                <div class="hourly-forecast" id="hourlyForecast">
+                    <div class="hour-item">
+                        <div class="hour-time">12:00</div>
+                        <div class="hour-temp">24°</div>
+                        <div class="hour-rain">☀️</div>
+                    </div>
+                    <div class="hour-item">
+                        <div class="hour-time">13:00</div>
+                        <div class="hour-temp">25°</div>
+                        <div class="hour-rain">☀️</div>
+                    </div>
+                    <div class="hour-item">
+                        <div class="hour-time">14:00</div>
+                        <div class="hour-temp">26°</div>
+                        <div class="hour-rain">⛅</div>
+                    </div>
+                    <div class="hour-item">
+                        <div class="hour-time">15:00</div>
+                        <div class="hour-temp">25°</div>
+                        <div class="hour-rain">☁️</div>
+                    </div>
+                    <div class="hour-item">
+                        <div class="hour-time">16:00</div>
+                        <div class="hour-temp">23°</div>
+                        <div class="hour-rain">☁️</div>
+                    </div>
+                    <div class="hour-item">
+                        <div class="hour-time">17:00</div>
+                        <div class="hour-temp">22°</div>
+                        <div class="hour-rain">🌧️</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 7-Day Forecast Widget -->
+            <div class="widget">
+                <h2 class="widget-title">📅 7-Day Forecast</h2>
+                <div class="forecast-container" id="weekForecast">
+                    <div class="forecast-day">
+                        <div class="forecast-date">Mon</div>
+                        <div class="forecast-icon">☀️</div>
+                        <div class="forecast-temp">
+                            <span class="forecast-temp-max">26°</span> / 
+                            <span class="forecast-temp-min">18°</span>
+                        </div>
+                    </div>
+                    <div class="forecast-day">
+                        <div class="forecast-date">Tue</div>
+                        <div class="forecast-icon">⛅</div>
+                        <div class="forecast-temp">
+                            <span class="forecast-temp-max">24°</span> / 
+                            <span class="forecast-temp-min">17°</span>
+                        </div>
+                    </div>
+                    <div class="forecast-day">
+                        <div class="forecast-date">Wed</div>
+                        <div class="forecast-icon">☁️</div>
+                        <div class="forecast-temp">
+                            <span class="forecast-temp-max">22°</span> / 
+                            <span class="forecast-temp-min">16°</span>
+                        </div>
+                    </div>
+                    <div class="forecast-day">
+                        <div class="forecast-date">Thu</div>
+                        <div class="forecast-icon">🌧️</div>
+                        <div class="forecast-temp">
+                            <span class="forecast-temp-max">20°</span> / 
+                            <span class="forecast-temp-min">15°</span>
+                        </div>
+                    </div>
+                    <div class="forecast-day">
+                        <div class="forecast-date">Fri</div>
+                        <div class="forecast-icon">⛅</div>
+                        <div class="forecast-temp">
+                            <span class="forecast-temp-max">23°</span> / 
+                            <span class="forecast-temp-min">16°</span>
+                        </div>
+                    </div>
+                    <div class="forecast-day">
+                        <div class="forecast-date">Sat</div>
+                        <div class="forecast-icon">☀️</div>
+                        <div class="forecast-temp">
+                            <span class="forecast-temp-max">25°</span> / 
+                            <span class="forecast-temp-min">17°</span>
+                        </div>
+                    </div>
+                    <div class="forecast-day">
+                        <div class="forecast-date">Sun</div>
+                        <div class="forecast-icon">☀️</div>
+                        <div class="forecast-temp">
+                            <span class="forecast-temp-max">27°</span> / 
+                            <span class="forecast-temp-min">19°</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="dashboard.js"></script>
+</body>
+</html>

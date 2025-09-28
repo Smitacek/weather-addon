@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Dark background for dashboard -->
+  <defs>
+    <linearGradient id="dashGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1F2937;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#111827;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" fill="url(#dashGradient)" rx="10" ry="10"/>
+  
+  <!-- Dashboard grid -->
+  <g opacity="0.3">
+    <line x1="25" y1="0" x2="25" y2="100" stroke="#4B5563" stroke-width="0.5"/>
+    <line x1="50" y1="0" x2="50" y2="100" stroke="#4B5563" stroke-width="0.5"/>
+    <line x1="75" y1="0" x2="75" y2="100" stroke="#4B5563" stroke-width="0.5"/>
+    <line x1="0" y1="25" x2="100" y2="25" stroke="#4B5563" stroke-width="0.5"/>
+    <line x1="0" y1="50" x2="100" y2="50" stroke="#4B5563" stroke-width="0.5"/>
+    <line x1="0" y1="75" x2="100" y2="75" stroke="#4B5563" stroke-width="0.5"/>
+  </g>
+  
+  <!-- Chart widget (top left) -->
+  <g transform="translate(15,15)">
+    <rect x="0" y="0" width="30" height="25" fill="#374151" rx="3" opacity="0.8"/>
+    <polyline points="5,20 10,15 15,18 20,10 25,12" stroke="#10B981" stroke-width="2" fill="none"/>
+  </g>
+  
+  <!-- Weather widget (top right) -->
+  <g transform="translate(55,15)">
+    <rect x="0" y="0" width="30" height="25" fill="#374151" rx="3" opacity="0.8"/>
+    <circle cx="15" cy="12" r="5" fill="#FBBF24"/>
+    <ellipse cx="15" cy="20" rx="8" ry="5" fill="#E5E7EB" opacity="0.8"/>
+  </g>
+  
+  <!-- Solar gauge (bottom left) -->
+  <g transform="translate(15,55)">
+    <rect x="0" y="0" width="30" height="25" fill="#374151" rx="3" opacity="0.8"/>
+    <circle cx="15" cy="15" r="10" fill="none" stroke="#6B7280" stroke-width="2"/>
+    <path d="M 15,15 L 15,5" stroke="#FBBF24" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="15" cy="15" r="2" fill="#FBBF24"/>
+  </g>
+  
+  <!-- Forecast bars (bottom right) -->
+  <g transform="translate(55,55)">
+    <rect x="0" y="0" width="30" height="25" fill="#374151" rx="3" opacity="0.8"/>
+    <rect x="5" y="15" width="4" height="8" fill="#60A5FA"/>
+    <rect x="11" y="10" width="4" height="13" fill="#60A5FA"/>
+    <rect x="17" y="12" width="4" height="11" fill="#60A5FA"/>
+    <rect x="23" y="8" width="4" height="15" fill="#60A5FA"/>
+  </g>
+  
+  <!-- Dashboard text -->
+  <text x="50" y="92" font-family="Arial, sans-serif" font-size="8" font-weight="bold" text-anchor="middle" fill="#E5E7EB">DASHBOARD</text>
+</svg>
