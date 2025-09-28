@@ -4,6 +4,7 @@ import datetime as dt
 from typing import Dict, Any
 
 from astral.sun import elevation as sun_elevation, azimuth as sun_azimuth
+from astral import Observer
 
 
 I_SC = 1367.0  # W/m^2 solar constant
@@ -18,9 +19,10 @@ def _to_deg(rad: float) -> float:
 
 
 def solar_geometry(lat: float, lon: float, when_utc: dt.datetime) -> Dict[str, float]:
-    """Compute solar elevation/azimuth/zenith using astral for given UTC time."""
-    el = float(sun_elevation(lat, lon, when_utc))
-    az = float(sun_azimuth(lat, lon, when_utc))
+    """Compute solar elevation/azimuth/zenith using Astral Observer for given UTC time."""
+    obs = Observer(latitude=float(lat), longitude=float(lon))
+    el = float(sun_elevation(obs, when_utc))
+    az = float(sun_azimuth(obs, when_utc))
     zen = max(0.0, 90.0 - el)
     return {
         "sun_elevation_deg": el,
