@@ -105,7 +105,7 @@ def fetch_open_meteo(
         hourly.append(rec)
 
     # truncate to requested horizon from now
-    now = dt.datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+    now = dt.datetime.now(dt.timezone.utc).replace(minute=0, second=0, microsecond=0)
     horizon_end = now + dt.timedelta(hours=int(hourly_horizon_h))
     hourly = [
         h for h in hourly
@@ -137,4 +137,3 @@ def fetch_open_meteo(
         "hourly": hourly,
         "daily": daily,
     }
-

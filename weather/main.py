@@ -19,7 +19,7 @@ def setup_logging(level: str = "INFO"):
 
 def main() -> int:
     setup_logging("INFO")
-    logging.info("🌦️  Weather Add-on skeleton starting (v0.0.1)")
+    logging.info("🌦️  Weather Add-on starting (v0.1.1)")
 
     try:
         config = get_config()
@@ -189,7 +189,7 @@ def main() -> int:
             if mqtt and mqtt.connected:
                 try:
                     # current hour (closest >= now)
-                    now = dt.datetime.utcnow().replace(minute=0, second=0, microsecond=0)
+                    now = dt.datetime.now(dt.timezone.utc).replace(minute=0, second=0, microsecond=0)
                     cur = None
                     for r in upcoming_hourly:
                         ts = dt.datetime.fromisoformat(r["ts_utc"].replace("Z", "+00:00"))
