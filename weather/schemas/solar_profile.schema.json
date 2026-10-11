@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "issue_id",
+    "issued_at_utc",
+    "fetched_at_utc",
+    "model",
+    "array_config",
+    "intervals",
+    "daily"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 2
+    },
+    "issue_id": {
+      "type": "string"
+    },
+    "issued_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "fetched_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "array_config": {
+      "type": "array"
+    },
+    "intervals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "interval_start_utc",
+          "interval_end_utc",
+          "power_w",
+          "energy_kwh",
+          "arrays",
+          "quality"
+        ],
+        "properties": {
+          "power_w": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "energy_kwh": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "daily": {
+      "type": "array"
+    }
+  }
+}
