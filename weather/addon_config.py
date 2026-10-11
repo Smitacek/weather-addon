@@ -6,10 +6,13 @@ Mirrors structure from bms-reader-addon (reads /data/options.json)
 
 import json
 from pathlib import Path
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from solar_model import normalize_arrays, finite
 
 
 class Config:
-    def __init__(self):
+    def __init__(self, options_path="/data/options.json"):
+        self.options_path = Path(options_path)
         self.load_config()
 
     def load_config(self):
@@ -59,15 +62,41 @@ class Config:
         self.mqtt_password = options.get("mqtt_password", "")
         self.mqtt_topic_prefix = options.get("mqtt_topic_prefix", "weather")
         self.ha_discovery_enabled = bool(options.get("ha_discovery_enabled", False))
+        self.solar_enabled = bool(options.get("solar_enabled", False))
+        self.pv_arrays = normalize_arrays(options)
+        self.solar_retention_days = int(options.get("solar_retention_days", 400))
+        self.conservative_factor = finite(options.get("conservative_factor", 0.8), "conservative_factor")
+        self.telemetry_topics = options.get("telemetry_topics", {})
+        self.telemetry_max_age_s = int(options.get("telemetry_max_age_s", 90))
+        self.pv_mapping_confirmed = bool(options.get("pv_mapping_confirmed", False))
+        self.operating_limits_confirmed = bool(options.get("operating_limits_confirmed", False))
+        self.solar_archive_path = str(options.get("solar_archive_path", "/data/solar.sqlite3"))
+        try:
+            ZoneInfo(self.timezone)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise ValueError("Invalid timezone") from exc
+        if self.units != "metric" or self.provider != "open-meteo":
+            raise ValueError("Only Open-Meteo with metric SI units is supported")
+        if not -90 <= finite(self.latitude,"latitude") <= 90 or not -180 <= finite(self.longitude,"longitude") <= 180:
+            raise ValueError("Invalid location")
+        if not 60 <= self.update_interval <= 3600 or not 1 <= self.hourly_horizon_h <= 168:
+            raise ValueError("Invalid cadence/horizon")
+        if not 0 < self.conservative_factor <= 1 or not 1 <= self.solar_retention_days <= 1825:
+            raise ValueError("Invalid retention/conservative factor")
+        if not 10 <= self.telemetry_max_age_s <= 600 or not isinstance(self.telemetry_topics,dict):
+            raise ValueError("Invalid telemetry options")
+        if self.solar_enabled and not self.pv_arrays:
+            raise ValueError("Solar enabled without PV arrays")
+
 
     def load_addon_options(self):
-        options_file = Path("/data/options.json")
+        options_file = self.options_path
         if options_file.exists():
             try:
                 with open(options_file, "r") as f:
                     return json.load(f)
-            except Exception:
-                return {}
+            except Exception as exc:
+                raise ValueError("Invalid options.json") from exc
         return {}
 
 

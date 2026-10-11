@@ -1,102 +1,87 @@
-name: "Weather Add-on"
-version: "0.1.2"
-slug: "weather"
-description: "Weather + solar forecast skeleton for PV yield optimization (structure based on bms-reader-addon)"
+name: Weather Add-on
+version: 0.1.2
+slug: weather
+description: Weather + solar forecast skeleton for PV yield optimization (structure
+  based on bms-reader-addon)
 arch:
-  - armhf
-  - aarch64
-  - amd64
+- armhf
+- aarch64
+- amd64
 init: false
 startup: application
 boot: manual
 stage: experimental
-homeassistant: "2023.1.0"
-url: "https://example.com/weather-addon"
-
+homeassistant: 2023.1.0
+url: https://example.com/weather-addon
 options:
-  # Location & site identity
-  site_id: "default"             # used in MQTT topics and logs
+  site_id: default
   latitude: 0.0
   longitude: 0.0
   elevation_m: 0.0
-  timezone: "UTC"
-
-  # Provider & model
-  provider: "open-meteo"         # e.g., open-meteo, openweathermap
-  provider_model: "auto"          # provider-specific model (if applicable)
-  api_key: ""
-  units: "metric"                # metric|imperial
-
-  # PV system parameters (for derived POA and yield)
-  pv_capacity_kw: 3.0             # DC STC capacity
+  timezone: UTC
+  provider: open-meteo
+  provider_model: auto
+  api_key: ''
+  units: metric
+  pv_capacity_kw: 3.0
   tilt_deg: 35.0
-  albedo: 0.20
-  gamma_p_pct_per_c: -0.4         # power temperature coeff (%/°C)
-  noct_cell_temp_c: 45.0          # nominal cell temp at 800 W/m², 20°C, 1 m/s
+  albedo: 0.2
+  gamma_p_pct_per_c: -0.4
+  noct_cell_temp_c: 45.0
   inverter_ac_limit_kw: 3.0
-
-  # Forecast horizon & cadence
-  forecast_days: 7                # daily horizon
-  hourly_horizon_h: 72            # hourly horizon
+  forecast_days: 7
+  hourly_horizon_h: 72
   nowcast_enabled: false
-  nowcast_step_s: 900             # 5–15 min typical
-
-  # Update & logging
+  nowcast_step_s: 900
   update_interval: 300
   log_level: info
-  log_raw: true                   # store raw provider features
-  log_features: true              # store derived PV features
+  log_raw: true
+  log_features: true
   log_retention_days: 90
-  log_format: "jsonl"             # jsonl|csv|parquet (jsonl implemented first)
-  data_version: "1.0"
-
-  # MQTT publication
+  log_format: jsonl
+  data_version: '1.0'
   mqtt_enabled: true
-  mqtt_host: "core-mosquitto"
+  mqtt_host: core-mosquitto
   mqtt_port: 1883
-  mqtt_username: ""
-  mqtt_password: ""
-  mqtt_topic_prefix: "weather"
+  mqtt_username: ''
+  mqtt_password: ''
+  mqtt_topic_prefix: weather
   ha_discovery_enabled: true
-
+  solar_enabled: false
+  pv_arrays: []
+  solar_retention_days: 400
+  conservative_factor: 0.8
+  telemetry_topics: {}
+  telemetry_max_age_s: 90
+  pv_mapping_confirmed: false
+  operating_limits_confirmed: false
 schema:
-  # Identity & location
   site_id: str?
   latitude: float
   longitude: float
   elevation_m: float?
   timezone: str?
-
-  # Provider
-  provider: list(open-meteo|openweathermap)?
+  provider: list(open-meteo)?
   provider_model: str?
   api_key: str?
-  units: list(metric|imperial)?
-
-  # PV system
+  units: list(metric)?
   pv_capacity_kw: float?
   tilt_deg: float?
   albedo: float?
   gamma_p_pct_per_c: float?
   noct_cell_temp_c: float?
   inverter_ac_limit_kw: float?
-
-  # Horizons & cadence
   forecast_days: int(1,14)?
   hourly_horizon_h: int(1,168)?
   nowcast_enabled: bool?
   nowcast_step_s: int(60,1800)?
   update_interval: int(60,3600)
-
-  # Logging
   log_level: list(debug|info|warning|error|critical)?
   log_raw: bool?
   log_features: bool?
   log_retention_days: int(1,365)?
   log_format: list(jsonl|csv|parquet)?
   data_version: str?
-
-  # MQTT
   mqtt_enabled: bool?
   mqtt_host: str?
   mqtt_port: port?
@@ -104,3 +89,38 @@ schema:
   mqtt_password: password?
   mqtt_topic_prefix: str?
   ha_discovery_enabled: bool?
+  solar_enabled: bool?
+  solar_retention_days: int(1,1825)?
+  conservative_factor: float(0.01,1)?
+  telemetry_max_age_s: int(10,600)?
+  pv_mapping_confirmed: bool?
+  operating_limits_confirmed: bool?
+  pv_arrays:
+  - id: str
+    capacity_kw: float(0.001,1000)
+    tilt_deg: float(0,90)
+    azimuth_deg: float(0,360)
+    gamma_per_c: float(-0.02,0)?
+    noct_c: float(20,100)?
+    loss_fraction: float(0,0.99)?
+    shading_factor: float(0,1)?
+    geometry_confirmed: bool?
+  telemetry_topics:
+    pv1_power_w: str?
+    pv2_power_w: str?
+    pv1_voltage_v: str?
+    pv2_voltage_v: str?
+    pv1_current_a: str?
+    pv2_current_a: str?
+    ac_power_w: str?
+    battery1_soc: str?
+    battery2_soc: str?
+    battery1_power_w: str?
+    battery2_power_w: str?
+    inverter_mode: str?
+    charge_stage: str?
+    inverter_connection: str?
+    inverter_available: str?
+    bms_connection: str?
+    battery1_available: str?
+    battery2_available: str?
