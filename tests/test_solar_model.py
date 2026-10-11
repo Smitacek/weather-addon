@@ -1,3 +1,4 @@
+import tests
 import unittest
 import datetime as dt
 from solar_model import dc_power_w, build_profile, normalize_arrays

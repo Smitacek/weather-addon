@@ -1,3 +1,4 @@
+import tests
 import unittest
 from providers.open_meteo import parse_hourly, merge_poa, provider_azimuth
 

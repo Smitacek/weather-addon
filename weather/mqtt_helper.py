@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 import json
 import time
+import datetime as dt
+from pathlib import Path
+
+VERSION = Path(__file__).with_name("VERSION").read_text().strip()
 from typing import Optional
 
 import paho.mqtt.client as mqtt
 
 
 class MQTTPublisher:
-    def __init__(self, host: str, port: int, username: str = "", password: str = "", topic_prefix: str = "weather", site_id: str = "default"):
+    def __init__(self, host: str, port: int, username: str = "", password: str = "", topic_prefix: str = "weather", site_id: str = "default", collector=None, ttl_s=900):
         self.host = host
         self.port = port
         self.username = username or None
@@ -16,9 +20,12 @@ class MQTTPublisher:
         self.site_id = site_id
         self.client: Optional[mqtt.Client] = None
         self.connected: bool = False
+        self.collector = collector
+        self.ttl_s = ttl_s
+        self.discovery_needed = False
 
     def connect(self, timeout: int = 10, retries: int = 3) -> bool:
-        self.client = mqtt.Client()
+        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         if self.username:
             self.client.username_pw_set(self.username, self.password or "")
         will_topic = f"{self.topic_prefix}/{self.site_id}/availability"
@@ -26,31 +33,32 @@ class MQTTPublisher:
 
         def on_connect(client, userdata, flags, rc, properties=None):
             self.connected = (rc == 0)
-        def on_disconnect(client, userdata, rc, properties=None):
+            if self.connected:
+                self.publish_raw(will_topic, "online", retain=True)
+                client.subscribe("homeassistant/status", qos=1)
+                if self.collector:
+                    for topic in self.collector.by_topic: client.subscribe(topic, qos=1)
+                self.discovery_needed = True
+        def on_disconnect(client, userdata, flags, rc, properties=None):
             self.connected = False
+            if self.collector: self.collector.disconnected()
+        def on_message(client, userdata, msg):
+            if msg.topic == "homeassistant/status" and msg.payload == b"online":
+                self.discovery_needed = True
+            if self.collector:
+                self.collector.ingest(msg.topic, msg.payload, dt.datetime.now(dt.timezone.utc), msg.retain)
 
         self.client.on_connect = on_connect
         self.client.on_disconnect = on_disconnect
+        self.client.on_message = on_message
 
-        attempt = 0
-        while attempt < max(1, retries):
-            attempt += 1
-            try:
-                self.client.connect(self.host, self.port, keepalive=30)
-                self.client.loop_start()
-                # wait for connection
-                waited = 0
-                while not self.connected and waited < timeout:
-                    time.sleep(0.2)
-                    waited += 0.2
-                if self.connected:
-                    # publish online
-                    self.publish_raw(will_topic, "online", retain=True)
-                    return True
-            except Exception:
-                pass
-            time.sleep(1.0)
-        return False
+        self.client.reconnect_delay_set(min_delay=1, max_delay=30)
+        self.client.connect_async(self.host, self.port, keepalive=30)
+        self.client.loop_start()
+        deadline = time.monotonic() + timeout
+        while not self.connected and time.monotonic() < deadline:
+            time.sleep(0.1)
+        return self.connected
 
     def ensure_connected(self, timeout: int = 5) -> bool:
         if self.connected:
@@ -66,16 +74,16 @@ class MQTTPublisher:
     def publish_json(self, topic_suffix: str, payload: dict, retain: bool = False, qos: int = 0) -> bool:
         topic = f"{self.topic_prefix}/{self.site_id}/{topic_suffix.lstrip('/')}"
         try:
-            s = json.dumps(payload, separators=(",", ":"))
-            self.client.publish(topic, payload=s, qos=qos, retain=retain)
-            return True
+            s = json.dumps(payload, separators=(",", ":"), allow_nan=False)
+            result = self.client.publish(topic, payload=s, qos=qos, retain=retain)
+            return result.rc == mqtt.MQTT_ERR_SUCCESS
         except Exception:
             return False
 
     def publish_raw(self, topic: str, payload: str, retain: bool = False, qos: int = 0) -> bool:
         try:
-            self.client.publish(topic, payload=payload, qos=qos, retain=retain)
-            return True
+            result = self.client.publish(topic, payload=payload, qos=qos, retain=retain)
+            return result.rc == mqtt.MQTT_ERR_SUCCESS
         except Exception:
             return False
 
@@ -90,7 +98,7 @@ class MQTTPublisher:
             "name": f"Weather {self.site_id}",
             "manufacturer": "Weather Add-on",
             "model": "Solar Forecast",
-            "sw_version": "0.1.1"
+            "sw_version": VERSION
         }
         payload = {
             "name": name,
@@ -99,6 +107,7 @@ class MQTTPublisher:
             "availability_topic": availability,
             "device": device,
             "value_template": "{{ value_json.value }}",
+            "expire_after": self.ttl_s,
         }
         if unit:
             payload["unit_of_measurement"] = unit
@@ -107,7 +116,7 @@ class MQTTPublisher:
         if state_class:
             payload["state_class"] = state_class
         try:
-            self.client.publish(topic, json.dumps(payload, separators=(",", ":")), qos=1, retain=True)
+            self.client.publish(topic, json.dumps(payload, separators=(",", ":"), allow_nan=False), qos=1, retain=True)
             return True
         except Exception:
             return False
@@ -264,3 +273,37 @@ class MQTTPublisher:
                 self.client.disconnect()
         except Exception:
             pass
+
+    def publish_solar_discovery(self):
+        for metric in SOLAR_METRICS:
+            cfg = solar_discovery(metric,self.site_id,self.ttl_s,self.topic_prefix)
+            topic = f"homeassistant/sensor/{cfg['unique_id']}/config"
+            self.publish_raw(topic,json.dumps(cfg),retain=True,qos=1)
+
+SOLAR_METRICS = {
+ 'available_power_w': ('Odhad dostupného FV výkonu', 'W', 'power', 'measurement'),
+ 'remaining_today_energy_kwh': ('Odhad FV energie zbývající dnes', 'kWh', 'energy', None),
+ 'tomorrow_energy_kwh': ('Odhad FV energie zítra', 'kWh', 'energy', None),
+ 'day_after_tomorrow_energy_kwh': ('Odhad FV energie pozítří', 'kWh', 'energy', None),
+ 'tomorrow_conservative_energy_kwh': ('Konzervativní odhad FV energie zítra', 'kWh', 'energy', None),
+ 'day_after_tomorrow_conservative_energy_kwh': ('Konzervativní odhad FV energie pozítří', 'kWh', 'energy', None),
+ 'last_forecast': ('Poslední platná FV předpověď', None, 'timestamp', None),
+ 'forecast_age_s': ('Stáří FV předpovědi', 's', 'duration', 'measurement'),
+ 'archive_status': ('Stav FV archivu', None, None, None),
+}
+
+def solar_discovery(metric,site_id,ttl_s,prefix='weather'):
+    name,unit,dclass,stateclass=SOLAR_METRICS[metric]
+    base=f"{prefix}/{site_id}"
+    cfg=dict(name=name,unique_id=f"weather_{site_id}_solar_{metric}",
+        state_topic=f"{base}/solar/metrics/{metric}",value_template="{{ value_json.value }}",
+        expire_after=ttl_s,availability_mode='all',availability=[
+            {'topic':f"{base}/availability"}, {'topic':f"{base}/solar/availability"}],
+        device={'identifiers':[f"weather_addon_{site_id}"],'name':f"Weather {site_id}",
+                'manufacturer':'Weather Add-on','model':'Solar Forecast','sw_version':VERSION})
+    if unit: cfg['unit_of_measurement']=unit
+    if dclass: cfg['device_class']=dclass
+    if stateclass: cfg['state_class']=stateclass
+    if metric in ('last_forecast','forecast_age_s','archive_status'): cfg['entity_category']='diagnostic'
+    if metric=='archive_status': cfg['availability']=[{'topic':f"{base}/availability"}]
+    return cfg

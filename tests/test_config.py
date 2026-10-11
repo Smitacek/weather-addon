@@ -1,3 +1,4 @@
+import tests
 import json
 import tempfile
 import unittest

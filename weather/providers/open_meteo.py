@@ -50,7 +50,7 @@ def fetch_open_meteo(*,latitude,longitude,hourly_horizon_h,forecast_days,units='
     if units!='metric': raise ValueError('SI metric units required')
     params={'latitude':latitude,'longitude':longitude,'hourly':','.join(FIELDS),
             'timezone':'UTC','temperature_unit':'celsius','wind_speed_unit':'ms',
-            'forecast_days':min(16,max(forecast_days,(hourly_horizon_h+23)//24+2))}
+            'forecast_days':min(16,max(forecast_days,(hourly_horizon_h+23)//24+2)), 'past_days':1}
     if provider_model!='auto': params['models']=provider_model
     def fetch(p):
         response=requests.get(OPEN_METEO_URL,params=p,timeout=(5,20))
@@ -62,5 +62,19 @@ def fetch_open_meteo(*,latitude,longitude,hourly_horizon_h,forecast_days,units='
         tilted=fetch({**params,'hourly':'global_tilted_irradiance','tilt':a['tilt_deg'],
                       'azimuth':provider_azimuth(a['azimuth_deg'])})
         merge_poa(hourly,tilted,a['id'])
+    daily_data=fetch({**params,'hourly':None,'timezone':timezone,
+        'daily':'sunshine_duration,precipitation_sum,temperature_2m_max,temperature_2m_min,wind_speed_10m_max'})
+    d=daily_data.get('daily',{})
+    days=[]
+    daily_fields={'sunshine_duration':'sunshine_duration_s','precipitation_sum':'precip_day_total_mm',
+        'temperature_2m_max':'temp_day_max_c','temperature_2m_min':'temp_day_min_c','wind_speed_10m_max':'wind_day_max_ms'}
+    for key,values in d.items():
+        if len(values)!=len(d.get('time',[])): raise ValueError('Invalid daily forecast field length')
+    for i,date in enumerate(d.get('time',[])):
+        row={'date_local':date}
+        for key,target in daily_fields.items():
+            value=d.get(key,[None]*len(d['time']))[i]
+            row[target]=finite(value,key) if value is not None else None
+        days.append(row)
     return {'issue_time_utc':iso(dt.datetime.now(dt.timezone.utc)),
-            'hourly':hourly,'daily':[]}
+            'hourly':hourly,'daily':days}

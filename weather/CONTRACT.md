@@ -99,3 +99,40 @@ Embed PV config snapshot to ensure reproducibility (panel azimuth excluded by de
 ## Backward/Forward Compatibility
 - Increment `data_version` when changing field names or semantics.
 - Prefer adding optional fields over changing existing ones.
+
+## Solar contract v2 (Weather 0.2.0)
+
+The earlier statement that azimuth is excluded is superseded. Solar forecasts
+require explicitly configured planes. No geometry is inferred from old options.
+
+- Radiation DNI is `direct_normal_irradiance`, not horizontal direct radiation.
+- Radiation intervals are preceding-hour means with explicit UTC start/end.
+- Existing daily topic `date_utc` is retained for compatibility but represents
+  the site's local calendar date; consumers should use `date_local` and timezone.
+- Missing/partial daily GHI is null, never zero; today's full-day weather estimate
+  and solar **remaining today** are distinct quantities.
+- Solar topics: `solar/profile`, `solar/health`, `solar/observed`, `solar/evaluation`,
+  `solar/metrics/<metric>` and `solar/availability`, all under `<prefix>/<site_id>`.
+- Profile schema 2 contains issue_id, issued_at_utc, fetched_at_utc, model,
+  array_config, timezone, assumptions, hourly intervals and local daily totals.
+  Each interval contains available DC power W, energy kWh, array-specific values,
+  weather, POA W/m² and quality; each daily record includes coverage and completeness.
+- Published issue time is local forecast creation; fetched time is HTTP retrieval.
+  Neither is claimed to be the meteorological model-run issue time.
+- Conservative factor is a scenario, not a validated confidence percentile.
+- HA forecast energy: energy/kWh, no state_class. Do not configure it as measured
+  production in Energy. Measured production remains the existing EASUN sensors.
+- Forecast expiry: three update intervals. Forecast availability and MQTT transport
+  availability are both required. Nulls are serialized as JSON null, NaN is rejected.
+- Observations sample MQTT every minute with per-field age and source availability.
+  Voltage/current/power remain independent protocol values; U×I is not used until
+  current-field semantics are verified. Source retained scalars are rejected.
+- Quality: missing, ambiguous, suspected_curtailed, confirmed_curtailed, eligible.
+  Default unknown operating limits imply ambiguous, never calibration eligibility.
+- SQLite `/data/solar.sqlite3` stores compressed immutable issue payloads and
+  observations with independent 400-day retention. JSONL weather logs keep their
+  configured retention. Archive failure is reported separately from forecast validity.
+- Evaluation is against an issue created at least one hour before the target interval;
+  coverage below 95% is not compared as a complete hour. This is diagnostic reporting,
+  not automatic model training. Unconfirmed per-plane mapping prevents interpreting
+  per-plane calibration results; no automatic calibration is implemented.
