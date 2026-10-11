@@ -1,4 +1,4 @@
-# Weather Dashboard 0.2.1
+# Weather Dashboard 0.2.2
 
 Existing HA ingress application for Weather forecasts and observed PV telemetry.
 Uses the existing MQTT broker and site topics; no external chart CDN.

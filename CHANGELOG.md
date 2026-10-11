@@ -1,3 +1,7 @@
+# Dashboard 0.2.2 — 2026-10-11
+
+- Reduce chart time-axis labels on narrow mobile screens to prevent overlapping dates. Weather remains 0.2.1.
+
 # 0.2.1 — 2026-10-11
 
 - Retain timestamped hourly weather in MQTT so a restarted Dashboard immediately receives the last valid issue. Existing freshness expiry continues to reject stale weather.

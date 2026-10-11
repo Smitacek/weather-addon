@@ -21,7 +21,7 @@ function plot(canvasId,rows,series,unit,hoverId,tz){
  const y=v=>h-pad-v/ceiling*(h-pad-20);
  for(let i=0;i<=4;i++){const value=ceiling*i/4;ctx.strokeStyle='#3a4656';ctx.beginPath();ctx.moveTo(pad,y(value));ctx.lineTo(w-15,y(value));ctx.stroke();ctx.fillStyle='#aab8ca';ctx.fillText(number(value,0),2,y(value)+4);}
  ctx.fillText(unit,3,13);
- const ticks=w<600?3:6;
+ const ticks=w<450?1:w<600?2:6;
  for(let i=0;i<=ticks;i++){const t=min+(max-min)*i/ticks;const label=new Intl.DateTimeFormat('cs-CZ',{timeZone:tz,day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(t));ctx.fillText(label,Math.min(w-110,Math.max(pad,x(t)-45)),h-10);}
  series.forEach(s=>{ctx.strokeStyle=s.color;ctx.lineWidth=2.5;ctx.beginPath();let pen=false,previous=null;
  rows.forEach(r=>{const value=s.value(r),time=new Date(r.time).getTime();if(typeof value!=='number'||!Number.isFinite(value)){pen=false;previous=null;return;}if(previous!==null&&time-previous>(canvasId==='observed'?120000:4000000))pen=false;if(pen)ctx.lineTo(x(r.time),y(value));else ctx.moveTo(x(r.time),y(value));pen=true;previous=time;});ctx.stroke();});
