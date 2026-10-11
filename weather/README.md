@@ -21,7 +21,7 @@ This is a Home Assistant add-on for weather + solar forecast data, modeled after
 
 Usage: install as a local add-on repository, configure options (provider, location, PV params, horizons), and start. Implementation of real weather fetching/publishing is intentionally left as TODO.
 
-## Version 0.2.0: PV forecasts and observations
+## Version 0.2.1: PV forecasts and observations
 
 Enable `solar_enabled` and configure `pv_arrays` (id, capacity_kw, tilt_deg,
 azimuth_deg clockwise from north). Optional fields: gamma_per_c=-0.004,

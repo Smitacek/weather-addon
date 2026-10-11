@@ -53,7 +53,7 @@ def publish_weather(forecast,config,publisher,now):
     current=next((r for r in rows if timestamp(r['interval_start_utc'])<=timestamp(now)<timestamp(r['interval_end_utc'])),None)
     if current:
         for metric in HOURLY:
-            publisher.publish_json('hourly/'+metric,dict(ts_utc=iso(now),value=current.get(metric)))
+            publisher.publish_json('hourly/'+metric,dict(ts_utc=iso(now),value=current.get(metric)),retain=True,qos=1)
     publisher.publish_json('daily/ghi_daily_total_mj_m2',{'series':[
         dict(date_utc=d['date_local'],date_local=d['date_local'],value=d['ghi_daily_total_mj_m2']) for d in days]},retain=True)
     today=timestamp(now).astimezone(ZoneInfo(config.timezone)).date()

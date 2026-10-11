@@ -1,3 +1,8 @@
+# 0.2.1 — 2026-10-11
+
+- Retain timestamped hourly weather in MQTT so a restarted Dashboard immediately receives the last valid issue. Existing freshness expiry continues to reject stale weather.
+- Verified during HA deployment; regression test reproduces the missing restart data.
+
 # 0.2.0 — 2026-10-11
 
 - Existing Weather + Dashboard extended for multiple PV planes and 72-hour available DC production forecasts.
