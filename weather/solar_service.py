@@ -7,10 +7,14 @@ from solar_model import timestamp,iso,build_profile
 class SolarService:
     def __init__(self,config,publisher,archive,collector):
         self.config,self.publisher,self.archive,self.collector=config,publisher,archive,collector
-        self.profile=None;self.archive_error=None;self.provider_error=None
+        self.profile=None;self.forecast_archive_error=None;self.observation_archive_error=None;self.provider_error=None;self.weather_log_error=None
         self.evaluation={};self.last_evaluation=None;self.last_cleanup=None
+        self.observed_series=[]
         try: self.profile=archive.latest_forecast() if archive else None
-        except Exception as exc: self.archive_error=str(exc)
+        except Exception as exc: self.forecast_archive_error=str(exc)
+    @property
+    def archive_error(self):
+        return self.forecast_archive_error or self.observation_archive_error
     def record_error(self,error):
         self.provider_error=str(error)
     def accept_forecast(self,forecast,now):
@@ -24,15 +28,17 @@ class SolarService:
         try:
             if self.archive is None: raise OSError('Archive not initialized')
             self.archive.save_forecast(profile)
-            self.archive_error=None
+            self.forecast_archive_error=None
         except Exception as exc:
-            self.archive_error=str(exc);logging.error('Solar archive write failed: %s',exc)
+            self.forecast_archive_error=str(exc);logging.error('Solar archive write failed: %s',exc)
     def sample(self,now):
         sample=self.collector.snapshot(now)
         try:
             if self.archive is None: raise OSError('Archive not initialized')
             self.archive.save_observation(sample)
-            self.archive_error=None
+            self.observation_archive_error=None
+            recent=self.archive.recent_observations(timestamp(now)-dt.timedelta(hours=6),now)
+            self.observed_series=[{'ts_utc':r['ts_utc'],'values':r['values'],'quality':r['quality']} for r in recent[-400:]]
             if not self.last_cleanup or timestamp(now)-self.last_cleanup>=dt.timedelta(days=1):
                 self.archive.cleanup(now,self.config.solar_retention_days)
                 self.last_cleanup=timestamp(now)
@@ -40,15 +46,15 @@ class SolarService:
                 self.evaluation=self.archive.evaluation_summary(now)
                 self.last_evaluation=timestamp(now)
         except Exception as exc:
-            self.archive_error=str(exc);logging.error('Solar observation archive failed: %s',exc)
+            self.observation_archive_error=str(exc);logging.error('Solar observation archive failed: %s',exc)
         if self.publisher: self.publisher.publish_json('solar/observed',sample,retain=True,qos=1)
         return sample
     def health(self,now):
         age=(timestamp(now)-timestamp(self.profile['issued_at_utc'])).total_seconds() if self.profile else None
         valid=age is not None and 0<=age<=self.config.update_interval*3 and bool(self.profile['intervals'])
         return dict(ts_utc=iso(now),forecast_valid=valid,age_s=age,archive_ok=self.archive_error is None and self.archive is not None,
-                    archive_error=self.archive_error,provider_error=self.provider_error,
-                    mapping_confirmed=getattr(self.config,'pv_mapping_confirmed',False))
+                    archive_error=self.archive_error,provider_error=self.provider_error,weather_log_error=self.weather_log_error,
+                    mapping_confirmed=getattr(self.config,'pv_mapping_confirmed',False),ttl_s=self.config.update_interval*3)
     def publish(self,now):
         if not self.publisher: return
         health=self.health(now)
@@ -56,6 +62,7 @@ class SolarService:
         self.publisher.publish_raw(base+'/solar/availability','online' if health['forecast_valid'] else 'offline',retain=True,qos=1)
         self.publisher.publish_json('solar/health',health,retain=True,qos=1)
         self.publisher.publish_json('solar/evaluation',self.evaluation,retain=True,qos=1)
+        self.publisher.publish_json('solar/observed_series',{'samples':self.observed_series},retain=True,qos=1)
         if not self.profile: return
         self.publisher.publish_json('solar/profile',self.profile,retain=True,qos=1)
         today=timestamp(now).astimezone(ZoneInfo(self.config.timezone)).date()

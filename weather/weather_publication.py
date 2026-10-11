@@ -31,6 +31,12 @@ def daily_weather(rows,provider_days,timezone):
 
 def publish_weather(forecast,config,publisher,now):
     rows=[]
+    log_error=None
+    def log(prefix,record,field='ts_utc'):
+        nonlocal log_error
+        if log_error is not None: return
+        try: append_jsonl(prefix,record,field)
+        except OSError as exc: log_error=str(exc)
     for h in forecast['hourly']:
         # Solar geometry aligned with preceding-hour average radiation.
         mid=timestamp(h['interval_start_utc'])+dt.timedelta(minutes=30)
@@ -39,11 +45,11 @@ def publish_weather(forecast,config,publisher,now):
         rec={**h,**derived,'data_version':'2.0','fetched_at_utc':forecast['issue_time_utc'],
              'site_id':config.site_id,'provider':'open-meteo','timezone':config.timezone}
         rows.append(rec)
-        if config.log_raw or config.log_features: append_jsonl('hourly',rec)
+        if config.log_raw or config.log_features: log('hourly',rec)
     days=daily_weather(rows,forecast.get('daily',[]),config.timezone)
     if config.log_raw or config.log_features:
-        for d in days: append_jsonl('daily',{**d,'data_version':'2.0','site_id':config.site_id},'date_local')
-    if not publisher or not publisher.connected: return
+        for d in days: log('daily',{**d,'data_version':'2.0','site_id':config.site_id},'date_local')
+    if not publisher or not publisher.connected: return log_error
     current=next((r for r in rows if timestamp(r['interval_start_utc'])<=timestamp(now)<timestamp(r['interval_end_utc'])),None)
     if current:
         for metric in HOURLY:
@@ -56,3 +62,5 @@ def publish_weather(forecast,config,publisher,now):
         for metric in DAILY:
             publisher.publish_json(f'daily/{label}/{metric}',{'date_local':day['date_local'] if day else None,
                 'date_utc':day['date_local'] if day else None,'value':day.get(metric) if day else None},retain=True)
+
+    return log_error

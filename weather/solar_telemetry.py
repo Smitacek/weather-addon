@@ -15,8 +15,16 @@ class TelemetryCollector:
         self.operating_limits_confirmed=operating_limits_confirmed
         self.lock=threading.Lock()
         self.fields={}
+        self.invalidations={}
+    def invalidate(self, keys, at):
+        for field in keys:
+            if field.endswith(('_available','_connection')): continue
+            self.fields.pop(field,None)
+            self.invalidations[field]=timestamp(at)
     def disconnected(self):
-        with self.lock: self.fields.clear()
+        with self.lock:
+            self.invalidate(self.topic_map,dt.datetime.now(dt.timezone.utc))
+            self.fields.clear()
     def ingest(self,topic,payload,received_at,retained=False):
         key=self.by_topic.get(topic)
         if key is None or len(payload)>4096: return
@@ -44,19 +52,27 @@ class TelemetryCollector:
             with self.lock:
                 previous=self.fields.get(key)
                 if previous and source<previous[1]: return
+                if key.endswith(('_available','_connection')) and value=='offline':
+                    if key.startswith('inverter_'): affected=[k for k in self.topic_map if k.startswith(('pv','ac_','inverter_','charge_'))]
+                    elif key=='bms_connection': affected=[k for k in self.topic_map if k.startswith('battery')]
+                    elif key.startswith('battery1_'): affected=[k for k in self.topic_map if k.startswith('battery1_')]
+                    else: affected=[k for k in self.topic_map if k.startswith('battery2_')]
+                    self.invalidate(affected,received_at)
                 self.fields[key]=(value,source,received_at)
         except (UnicodeError,ValueError,TypeError,KeyError):
             # Invalid fresh value invalidates prior data instead of silently holding it.
-            with self.lock: self.fields.pop(key,None)
+            with self.lock: self.invalidate([key],received_at)
     def snapshot(self,now):
         now=timestamp(now)
-        with self.lock: fields=dict(self.fields)
+        with self.lock:
+            fields=dict(self.fields)
+            invalidations=dict(self.invalidations)
         def valid(key):
             record=fields.get(key)
             return record and 0<=(now-record[1]).total_seconds()<=self.max_age_s
         def group_online(keys):
             return all(fields.get(k,('offline',))[0]=='online' for k in keys if k in self.topic_map)
-        values={};ages={};received={}
+        values={};ages={};received={};valid_until={}
         for key in self.topic_map:
             row=fields.get(key)
             is_availability=key.endswith('_available') or key.endswith('_connection')
@@ -73,6 +89,7 @@ class TelemetryCollector:
             values[key]=value
             ages[key]=(now-row[1]).total_seconds() if row else None
             received[key]=iso(row[2]) if row else None
+            valid_until[key]=iso(row[1]+dt.timedelta(seconds=self.max_age_s)) if row and not is_availability else None
         essential=['pv1_power_w','pv2_power_w','ac_power_w','battery1_soc','battery2_soc',
                    'battery1_power_w','battery2_power_w']
         missing=[key for key in essential if values.get(key) is None]
@@ -87,4 +104,5 @@ class TelemetryCollector:
             # Requires an operator's prior confirmation of physical limits.
             quality='eligible';reasons=['confirmed limits, active charging and battery headroom']
         return dict(ts_utc=iso(now),values=values,ages_s=ages,received_at_utc=received,
+                    valid_until_utc=valid_until,invalidated_at_utc={k:iso(t) for k,t in invalidations.items()},
                     quality=quality,reasons=reasons)

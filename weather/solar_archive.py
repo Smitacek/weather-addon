@@ -61,25 +61,36 @@ class SolarArchive:
         samples=self.recent_observations(start,end)
         metrics=['pv1_power_w','pv2_power_w','ac_power_w']
         energy={key:0.0 for key in metrics};coverage={key:0.0 for key in metrics}
-        both=0;eligible=0
+        both=0;eligible=0;joint_energy=0.0
         for first,second in zip(samples,samples[1:]):
             fs,se=timestamp(first['ts_utc']),timestamp(second['ts_utc'])
             if (se-fs).total_seconds()>90: continue
-            seconds=max(0,(min(end,se)-max(start,fs)).total_seconds())
+            segment_start=max(start,fs)
             vals=first.get('values',{})
+            durations={}
             for key in metrics:
+                segment_end=min(end,se)
+                expires=first.get('valid_until_utc',{}).get(key)
+                if expires: segment_end=min(segment_end,timestamp(expires))
+                invalidated=second.get('invalidated_at_utc',{}).get(key)
+                if invalidated and fs<timestamp(invalidated)<se:
+                    segment_end=min(segment_end,timestamp(invalidated))
+                seconds=max(0,(segment_end-segment_start).total_seconds())
                 v=vals.get(key)
+                durations[key]=seconds if isinstance(v,(int,float)) else 0
                 if isinstance(v,(int,float)):
                     energy[key]+=max(0,v)*seconds/3600000
                     coverage[key]+=seconds
-            if all(isinstance(vals.get(k),(int,float)) for k in metrics[:2]):
+            seconds=min(durations[k] for k in metrics[:2])
+            if seconds:
                 both+=seconds
+                joint_energy+=(max(0,vals['pv1_power_w'])+max(0,vals['pv2_power_w']))*seconds/3600000
                 if first.get('quality')=='eligible': eligible+=seconds
         total_seconds=(end-start).total_seconds()
         return {'interval_start_utc':iso(start),'interval_end_utc':iso(end),
             'arrays':{key:{'energy_kwh':energy[key+'_power_w'] if coverage[key+'_power_w'] else None,
                           'coverage_fraction':coverage[key+'_power_w']/total_seconds} for key in ['pv1','pv2']},
-            'energy_kwh':energy['pv1_power_w']+energy['pv2_power_w'] if both else None,
+            'energy_kwh':joint_energy if both else None,
             'coverage_fraction':both/total_seconds,'eligible_fraction':eligible/total_seconds,
             'ac_energy_kwh':energy['ac_power_w'] if coverage['ac_power_w'] else None}
     def evaluation_summary(self,now_utc):

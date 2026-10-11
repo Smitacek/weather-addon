@@ -1,8 +1,8 @@
 name: Weather Add-on
-version: 0.1.2
+version: 0.2.0
 slug: weather
-description: Weather + solar forecast skeleton for PV yield optimization (structure
-  based on bms-reader-addon)
+description: Weather and multi-plane PV forecasts with persistent forecast and telemetry
+  archive
 arch:
 - armhf
 - aarch64
@@ -12,7 +12,7 @@ startup: application
 boot: manual
 stage: experimental
 homeassistant: 2023.1.0
-url: https://example.com/weather-addon
+url: https://github.com/Smitacek/weather-addon
 options:
   site_id: default
   latitude: 0.0
@@ -119,6 +119,7 @@ schema:
     battery2_power_w: str?
     inverter_mode: str?
     charge_stage: str?
+    curtailment_active: str?
     inverter_connection: str?
     inverter_available: str?
     bms_connection: str?

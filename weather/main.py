@@ -62,8 +62,10 @@ def main():
                     logging.warning('Weather provider failed: %s',error)
                     if service: service.record_error(error)
                 else:
-                    publish_weather(forecast,config,publisher,now)
                     if service: service.accept_forecast(forecast,now)
+                    log_error=publish_weather(forecast,config,publisher,now)
+                    if service: service.weather_log_error=log_error
+                    if log_error: logging.error('Weather JSONL archive failed: %s',log_error)
                     cleanup_logs(config.log_retention_days)
                     logging.info('Forecast updated: %d intervals',len(forecast['hourly']))
             except queue.Empty: pass
