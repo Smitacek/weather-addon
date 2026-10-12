@@ -35,3 +35,30 @@ class DashboardTests(unittest.TestCase):
         client=TestClient(module.create_app(DataStore()))
         self.assertEqual(client.get('/static/dashboard.js').status_code,200)
         self.assertIn('Předpověď',client.get('/').text)
+
+    def test_comparison_period_aggregates_only_comparable_days(self):
+        store=DataStore();client=TestClient(module.create_app(store))
+        self.assertTrue(store.update_solar('comparison',{'schema_version':1,'timezone':'Europe/Prague','updated_at_utc':dt.datetime.now(UTC).isoformat(),'days':[
+            {'date_local':'2026-10-11','expected_hours':24,'elapsed_hours':24,'actual_energy_kwh':8,'predicted_energy_kwh':10,'error_kwh':-2,'comparable':True,'coverage_fraction':1,'eligible_fraction':0,'curtailed_fraction':0,'hours':[]},
+            {'date_local':'2026-10-12','expected_hours':24,'elapsed_hours':24,'actual_energy_kwh':2,'predicted_energy_kwh':10,'error_kwh':None,'comparable':False,'coverage_fraction':0.5,'eligible_fraction':0,'curtailed_fraction':0,'hours':[]}]}))
+        result=client.get('/api/comparison?period=month&date=2026-10-12').json()
+        self.assertEqual(result['summary']['comparable_days'],1)
+        self.assertEqual(result['summary']['error_kwh'],-2)
+        self.assertEqual(result['summary']['error_pct'],-20)
+        self.assertEqual(result['summary']['mae_kwh'],2)
+        self.assertEqual(client.get('/api/comparison?period=week&date=2026-10-12').json()['start_date'],'2026-10-12')
+        self.assertEqual(client.get('/api/comparison?period=year').status_code,400)
+        self.assertEqual(client.get('/api/comparison?period=day&date=bad').status_code,400)
+    def test_comparison_missing_and_zero_forecast_percent(self):
+        store=DataStore();client=TestClient(module.create_app(store))
+        response=client.get('/api/comparison?period=day&date=2026-10-11')
+        self.assertEqual(response.status_code,200)
+        self.assertIsNone(response.json()['summary']['actual_energy_kwh'])
+        self.assertTrue(store.update_solar('comparison',{'schema_version':1,'timezone':'Europe/Prague','updated_at_utc':dt.datetime.now(UTC).isoformat(),'days':[{'date_local':'2026-10-11','elapsed_hours':24,'expected_hours':24,'actual_energy_kwh':0,'predicted_energy_kwh':0,'error_kwh':0,'comparable':True,'coverage_fraction':1,'eligible_fraction':1,'curtailed_fraction':0,'hours':[]}]}))
+        self.assertIsNone(client.get('/api/comparison?period=day&date=2026-10-11').json()['summary']['error_pct'])
+        self.assertFalse(store.update_solar('comparison',{'schema_version':1,'timezone':'Europe/Prague','days':[None]}))
+
+    def test_missing_dst_day_still_has_correct_calendar_length(self):
+        client=TestClient(module.create_app(DataStore()))
+        result=client.get('/api/comparison?period=day&date=2026-03-29').json()
+        self.assertEqual(result['days'][0]['expected_hours'],23)

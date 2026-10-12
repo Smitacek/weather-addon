@@ -49,3 +49,6 @@ No night-tariff control or automatic battery charging is implemented.
 
 Run tests: `python -m unittest discover -s tests -v` from repository root with
 Weather, Dashboard and test requirements installed. See CONTRACT.md for v2 topics.
+
+## Comparison archive (0.3.0)
+The retained `solar/comparison` MQTT topic carries up to 400 local days and compact hourly rows `[utc_start, measured_kwh, predicted_kwh, coverage_fraction, eligible_fraction, curtailed_fraction]`. For each day the last forecast issued no later than the previous local evening at 22:00 is selected. The complete target-day forecast must be present. A current day compares only elapsed time. Error requires at least 95% measured coverage; suspected/confirmed curtailed observations stay visible but are not eligible for calibration. Closed days are cached after a three-minute boundary grace period in additive `daily_comparisons`; older releases ignore this table.

@@ -4,6 +4,7 @@ import threading
 import copy
 import datetime as dt
 import math
+from zoneinfo import ZoneInfo
 from typing import Dict, Any, Optional, List
 
 import paho.mqtt.client as mqtt
@@ -17,6 +18,7 @@ class DataStore:
         self.daily_today: Dict[str, Any] = {}
         self.daily_tomorrow: Dict[str, Any] = {}
         self.solar = {}
+        self.solar_comparison = {}
         self.solar_health = {}
         self.solar_evaluation = {}
         self.solar_observed = {}
@@ -65,6 +67,26 @@ class DataStore:
                     if not isinstance(row.get('arrays'),dict): return False
             elif metric == 'observed_series':
                 if not isinstance(payload.get('samples'),list) or len(payload['samples'])>400: return False
+            elif metric == 'comparison':
+                if payload.get('schema_version')!=1 or not isinstance(payload.get('days'),list) or len(payload['days'])>400: return False
+                ZoneInfo(payload['timezone']);parse_time(payload['updated_at_utc'])
+                previous=None
+                for day in payload['days']:
+                    if not isinstance(day,dict): return False
+                    date=dt.date.fromisoformat(day['date_local'])
+                    if previous is not None and date<=previous: return False
+                    previous=date
+                    if not 23<=day['expected_hours']<=25 or not 0<=day['elapsed_hours']<=day['expected_hours']: return False
+                    for key in ['coverage_fraction','eligible_fraction','curtailed_fraction']:
+                        if not isinstance(day.get(key),(int,float)) or not 0<=day[key]<=1: return False
+                    for key in ['actual_energy_kwh','predicted_energy_kwh','error_kwh']:
+                        if day.get(key) is not None and not isinstance(day[key],(int,float)): return False
+                    if not isinstance(day.get('hours'),list) or len(day['hours'])>25: return False
+                    for hour in day['hours']:
+                        if not isinstance(hour,list) or len(hour)!=6: return False
+                        parse_time(hour[0])
+                        if any(v is not None and (not isinstance(v,(int,float)) or v<0) for v in hour[1:3]): return False
+                        if any(not isinstance(v,(int,float)) or not 0<=v<=1 for v in hour[3:]): return False
             elif metric == 'evaluation':
                 if not isinstance(payload.get('hours',[]),list) or len(payload.get('hours',[]))>48: return False
             elif metric not in ('health','observed'): return False
@@ -72,6 +94,7 @@ class DataStore:
                 if metric == 'profile':
                     if self.solar and issued < parse_time(self.solar['issued_at_utc']): return False
                     self.solar = copy.deepcopy(payload)
+                elif metric == 'comparison': self.solar_comparison = copy.deepcopy(payload)
                 elif metric == 'health': self.solar_health = copy.deepcopy(payload)
                 elif metric == 'evaluation': self.solar_evaluation = copy.deepcopy(payload)
                 elif metric == 'observed': self.solar_observed = copy.deepcopy(payload)
@@ -82,6 +105,7 @@ class DataStore:
     def snapshot(self) -> Dict[str, Any]:
         with self.lock:
             return {
+                "solar_comparison": copy.deepcopy(self.solar_comparison),
                 "solar": copy.deepcopy(self.solar),
                 "solar_health": copy.deepcopy(self.solar_health),
                 "solar_evaluation": copy.deepcopy(self.solar_evaluation),

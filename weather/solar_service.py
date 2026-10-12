@@ -10,6 +10,7 @@ class SolarService:
         self.profile=None;self.forecast_archive_error=None;self.observation_archive_error=None;self.provider_error=None;self.weather_log_error=None
         self.evaluation={};self.last_evaluation=None;self.last_cleanup=None
         self.observed_series=[]
+        self.comparison={};self.comparison_dirty=False
         try: self.profile=archive.latest_forecast() if archive else None
         except Exception as exc: self.forecast_archive_error=str(exc)
     @property
@@ -44,6 +45,8 @@ class SolarService:
                 self.last_cleanup=timestamp(now)
             if not self.last_evaluation or timestamp(now)-self.last_evaluation>=dt.timedelta(minutes=5):
                 self.evaluation=self.archive.evaluation_summary(now)
+                self.comparison=self.archive.comparison_summary(now,self.config.timezone,self.config.solar_retention_days)
+                self.comparison_dirty=True
                 self.last_evaluation=timestamp(now)
         except Exception as exc:
             self.observation_archive_error=str(exc);logging.error('Solar observation archive failed: %s',exc)
@@ -62,6 +65,8 @@ class SolarService:
         self.publisher.publish_raw(base+'/solar/availability','online' if health['forecast_valid'] else 'offline',retain=True,qos=1)
         self.publisher.publish_json('solar/health',health,retain=True,qos=1)
         self.publisher.publish_json('solar/evaluation',self.evaluation,retain=True,qos=1)
+        if self.comparison_dirty and self.publisher.publish_json('solar/comparison',self.comparison,retain=True,qos=1):
+            self.comparison_dirty=False
         self.publisher.publish_json('solar/observed_series',{'samples':self.observed_series},retain=True,qos=1)
         if not self.profile: return
         self.publisher.publish_json('solar/profile',self.profile,retain=True,qos=1)

@@ -1,3 +1,11 @@
+# Weather and Dashboard 0.3.0 — 2026-10-12
+
+- Add Odhad vs. skutečnost panel with day, ISO week and calendar month navigation.
+- Freeze each day against the last archived forecast before 22:00 on the previous local evening; later revisions never replace its baseline.
+- Compare today's elapsed interval, expose missing history, coverage, net error and daily MAE. Zero forecast does not generate a percentage.
+- Flag suspected/confirmed curtailment independently from measured error; calibration eligibility remains conservative.
+- Preserve DST 23/25-hour days and cache closed daily comparisons without changing existing archive schema version or measurement sensor identities.
+
 # Dashboard 0.2.2 — 2026-10-11
 
 - Reduce chart time-axis labels on narrow mobile screens to prevent overlapping dates. Weather remains 0.2.1.

@@ -1,5 +1,5 @@
 name: Weather Dashboard
-version: 0.2.2
+version: 0.3.0
 slug: weather-dashboard
 description: Ingress UI for displaying weather and forecast from MQTT topics published
   by the Weather add-on
