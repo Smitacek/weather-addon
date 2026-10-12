@@ -16,16 +16,16 @@ function plot(canvasId,rows,series,unit,hoverId,tz){
  if(!valid.length){ctx.fillText('Zatím nejsou dostupná data',pad,h/2);canvas.onmousemove=null;return;}
  const min=new Date(rows[0].time).getTime(),max=new Date(rows[rows.length-1].time).getTime();
  const values=valid.flatMap(r=>series.map(s=>s.value(r)).filter(v=>typeof v==='number'&&Number.isFinite(v)));
- const ceiling=Math.max(unit==='V'?50:100,...values)*1.1;
+ const ceiling=Math.max(unit==='V'?50:unit==='kW'?0.1:100,...values)*1.1;
  const x=t=>pad+(new Date(t).getTime()-min)/Math.max(1,max-min)*(w-pad-15);
  const y=v=>h-pad-v/ceiling*(h-pad-20);
- for(let i=0;i<=4;i++){const value=ceiling*i/4;ctx.strokeStyle='#3a4656';ctx.beginPath();ctx.moveTo(pad,y(value));ctx.lineTo(w-15,y(value));ctx.stroke();ctx.fillStyle='#aab8ca';ctx.fillText(number(value,0),2,y(value)+4);}
+ for(let i=0;i<=4;i++){const value=ceiling*i/4;ctx.strokeStyle='#3a4656';ctx.beginPath();ctx.moveTo(pad,y(value));ctx.lineTo(w-15,y(value));ctx.stroke();ctx.fillStyle='#aab8ca';ctx.fillText(number(value,unit==='kW'?2:0),2,y(value)+4);}
  ctx.fillText(unit,3,13);
  const ticks=w<450?1:w<600?2:6;
  for(let i=0;i<=ticks;i++){const t=min+(max-min)*i/ticks;const label=new Intl.DateTimeFormat('cs-CZ',{timeZone:tz,day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(t));ctx.fillText(label,Math.min(w-110,Math.max(pad,x(t)-45)),h-10);}
  series.forEach(s=>{ctx.strokeStyle=s.color;ctx.lineWidth=2.5;ctx.beginPath();let pen=false,previous=null;
  rows.forEach(r=>{const value=s.value(r),time=new Date(r.time).getTime();if(typeof value!=='number'||!Number.isFinite(value)){pen=false;previous=null;return;}if(previous!==null&&time-previous>(canvasId==='observed'?120000:4000000))pen=false;if(pen)ctx.lineTo(x(r.time),y(value));else ctx.moveTo(x(r.time),y(value));pen=true;previous=time;});ctx.stroke();});
- canvas.onmousemove=event=>{const px=event.clientX-canvas.getBoundingClientRect().left;const t=min+(px-pad)/(w-pad-15)*(max-min);const nearest=rows.reduce((a,b)=>Math.abs(new Date(a.time)-t)<Math.abs(new Date(b.time)-t)?a:b);setText(hoverId,new Intl.DateTimeFormat('cs-CZ',{timeZone:tz,dateStyle:'short',timeStyle:'short'}).format(new Date(nearest.time))+'  '+series.map(s=>s.label+': '+number(s.value(nearest),unit==='V'?1:0)+' '+unit).join(' · '));};
+ canvas.onmousemove=event=>{const px=event.clientX-canvas.getBoundingClientRect().left;const t=min+(px-pad)/(w-pad-15)*(max-min);const nearest=rows.reduce((a,b)=>Math.abs(new Date(a.time)-t)<Math.abs(new Date(b.time)-t)?a:b);setText(hoverId,new Intl.DateTimeFormat('cs-CZ',{timeZone:tz,dateStyle:'short',timeStyle:'short'}).format(new Date(nearest.time))+'  '+series.map(s=>s.label+': '+number(s.value(nearest),(unit==='V'||unit==='kW')?2:0)+' '+unit).join(' · '));};
 }
 function render(){
  if(!data)return;const p=data.profile||{},health=data.health||{},tz=p.timezone||'Europe/Prague',valid=data.valid;
@@ -39,7 +39,13 @@ function render(){
  const entries=(p.array_config||[]).map((a,i)=>[a.id.toUpperCase(),i?blue:amber]);entries.push(['Celkem',mint]);legend(entries);
  const forecastRows=valid?(p.intervals||[]).map(r=>({...r,time:r.interval_start_utc})):[];
  const lines=(p.array_config||[]).map((a,i)=>({label:a.id.toUpperCase(),color:i?blue:amber,value:r=>r.arrays?.[a.id]?.power_w}));lines.push({label:'Celkem',color:mint,value:r=>r.power_w});
+ setText('forecast-title','Předpověď výkonu na '+number(forecastRows.length?(new Date(forecastRows.at(-1).interval_end_utc)-new Date(forecastRows[0].interval_start_utc))/3600000:null,0)+' hodin');
  plot('forecast',forecastRows,lines,'W','forecast-hover',tz);
+ const rest=data.remaining_today||{};const todayRows=intervalSteps(rest.intervals||[]);
+ const todayLines=(p.array_config||[]).map((a,i)=>({label:a.id.toUpperCase(),color:i?blue:amber,value:r=>typeof r.arrays?.[a.id]?.power_w==='number'?r.arrays[a.id].power_w/1000:null}));todayLines.push({label:'Celkem',color:mint,value:r=>typeof r.power_w==='number'?r.power_w/1000:null});
+ plot('today-power',todayRows,todayLines,'kW','today-power-hover',tz);
+ const peak=rest.peak_at_utc?new Intl.DateTimeFormat('cs-CZ',{timeZone:tz,hour:'2-digit',minute:'2-digit'}).format(new Date(rest.peak_at_utc)):'—';
+ setText('today-power-summary','Zbývá přibližně '+number(rest.energy_kwh)+' kWh. Nejvyšší hodinový průměr '+number(rest.peak_power_w===null||rest.peak_power_w===undefined?null:rest.peak_power_w/1000,2)+' kW v intervalu od '+peak+'.');
  const suffix=mode==='power'?'power_w':'voltage_v';plot('observed',(data.observed_series||[]).map(r=>({...r,time:r.ts_utc})),[{label:'FV1',color:amber,value:r=>r.values?.['pv1_'+suffix]},{label:'FV2',color:blue,value:r=>r.values?.['pv2_'+suffix]}],mode==='power'?'W':'V','observed-hover',tz);
  const values=data.observed_fresh?data.observed?.values||{}:{};$('measurements').replaceChildren();
  [['Výkon','power_w','W'],['Napětí','voltage_v','V'],['Proud','current_a','A']].forEach(([label,key,unit])=>{const row=document.createElement('tr');[label,number(values['pv1_'+key])+' '+unit,number(values['pv2_'+key])+' '+unit].forEach(text=>{const cell=document.createElement('td');cell.textContent=text;row.append(cell);});$('measurements').append(row);});

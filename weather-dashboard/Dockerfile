@@ -12,7 +12,7 @@ COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 COPY main.py .
-COPY mqtt_listener.py .
+COPY mqtt_listener.py forecast_view.py .
 COPY web ./web
 COPY run.sh /
 RUN chmod a+x /run.sh

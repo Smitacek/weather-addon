@@ -121,33 +121,25 @@ class SolarArchive:
                 'calibration_eligible':comparable and actual['eligible_fraction']>=0.95})
         return {'hours':results,'comparable_hours':sum(r['error_kwh'] is not None for r in results),
                 'eligible_hours':sum(r['calibration_eligible'] for r in results)}
-    def comparison_summary(self,now_utc,timezone,retention_days=400):
-        """Fixed previous-evening forecast and observations on local calendar days.
-
-        Closed days are cached after the final boundary sample can arrive. No later
-        forecast revision is substituted for the last issue at or before 22:00.
-        Compact hour rows keep the entire retained report within MQTT payload limits.
-        """
-        now=timestamp(now_utc);tz=ZoneInfo(timezone)
-        first,last=self.connection.execute('SELECT min(ts_utc),max(ts_utc) FROM observations').fetchone()
-        report=dict(schema_version=1,timezone=timezone,baseline_local_time='22:00',
-                    updated_at_utc=iso(now),first_observation_utc=first,last_observation_utc=last,days=[])
-        if not first: return report
-        today=now.astimezone(tz).date()
-        date=max(timestamp(first).astimezone(tz).date(),today-dt.timedelta(days=min(400,retention_days)-1))
-        while date<=today:
-            start,finish=day_bounds(date,tz)
-            if now<=start: break
-            cached=self.connection.execute('SELECT payload FROM daily_comparisons WHERE date_local=? AND timezone=?',(date.isoformat(),timezone)).fetchone()
-            if cached:
-                report['days'].append(decode(cached[0]));date+=dt.timedelta(days=1);continue
-            end=min(finish,now.replace(second=0,microsecond=0))
-            if end<=start: break
-            cutoff=dt.datetime.combine(date-dt.timedelta(days=1),dt.time(22),tz).astimezone(dt.timezone.utc)
-            row=self.connection.execute('SELECT payload FROM forecasts WHERE issued_at<=? ORDER BY issued_at DESC LIMIT 1',(iso(cutoff),)).fetchone()
-            profile=decode(row[0]) if row else None
+    def _comparison_day(self,date,now,tz):
+        start,finish=day_bounds(date,tz);end=min(finish,now.replace(second=0,microsecond=0))
+        actual=self.hourly_actual(start,end);hours=[];a=start
+        while a<end:
+            b=min(a+dt.timedelta(hours=1),end);v=self.hourly_actual(a,b)
+            hours.append([a.strftime('%Y-%m-%dT%H:%MZ'),round(v['energy_kwh'],6) if v['energy_kwh'] is not None else None,
+                None,round(v['coverage_fraction'],4),round(v['eligible_fraction'],4),round(v['curtailed_fraction'],4)])
+            a=b
+        horizons={}
+        for lead in [1,2,3]:
+            cutoff=dt.datetime.combine(date-dt.timedelta(days=lead),dt.time(22),tz).astimezone(dt.timezone.utc)
+            # ISO strings with optional fractional seconds are not exactly sortable
+            # within one second; apply the strict deadline on parsed timestamps.
+            candidates=self.connection.execute('SELECT payload FROM forecasts WHERE issued_at<=? ORDER BY issued_at DESC LIMIT 100',(iso(cutoff+dt.timedelta(seconds=1)),)).fetchall()
+            profiles=[decode(r[0]) for r in candidates]
+            profiles=[p for p in profiles if timestamp(p['issued_at_utc'])<=cutoff]
+            profile=max(profiles,key=lambda p:timestamp(p['issued_at_utc'])) if profiles else None
             def predicted(a,b):
-                if not profile: return None
+                if not profile:return None
                 total=0.0;covered=0.0
                 for r in profile['intervals']:
                     rs,re=timestamp(r['interval_start_utc']),timestamp(r['interval_end_utc'])
@@ -155,35 +147,57 @@ class SolarArchive:
                     if seconds and isinstance(r.get('power_w'),(int,float)):
                         total+=r['power_w']*seconds/3600000;covered+=seconds
                 return total if abs(covered-(b-a).total_seconds())<0.01 else None
-            actual=self.hourly_actual(start,end)
-            prediction=predicted(start,end);full=predicted(start,finish)
-            # Both a complete target-day forecast and enough measurement are required.
+            full=predicted(start,finish);prediction=predicted(start,end)
             comparable=full is not None and prediction is not None and actual['coverage_fraction']>=0.95
             error=actual['energy_kwh']-prediction if comparable else None
-            hours=[];a=start
-            while a<end:
-                b=min(a+dt.timedelta(hours=1),end);v=self.hourly_actual(a,b)
-                hours.append([a.strftime('%Y-%m-%dT%H:%MZ'),
-                    round(v['energy_kwh'],6) if v['energy_kwh'] is not None else None,
-                    round(predicted(a,b),6) if predicted(a,b) is not None and full is not None else None,
-                    round(v['coverage_fraction'],4),round(v['eligible_fraction'],4),round(v['curtailed_fraction'],4)])
-                a=b
-            day=dict(date_local=date.isoformat(),cutoff_utc=iso(cutoff),
-                issue_id=profile['issue_id'] if profile and full is not None else None,
-                issued_at_utc=profile['issued_at_utc'] if profile and full is not None else None,
-                expected_hours=(finish-start).total_seconds()/3600,
-                elapsed_hours=(end-start).total_seconds()/3600,partial=end<finish,
+            hourly=[]
+            for row in hours:
+                a=timestamp(row[0]);v=predicted(a,min(a+dt.timedelta(hours=1),end));hourly.append(round(v,6) if v is not None else None)
+            pairs=[(r[1],v) for r,v in zip(hours,hourly) if r[1] is not None and v is not None and r[3]>=0.95]
+            errors=[a-p for a,p in pairs];sum_prediction=sum(p for a,p in pairs)
+            meta=dict(cutoff_utc=iso(cutoff),issue_id=profile['issue_id'] if profile and any(v is not None for v in hourly) else None,
+                issued_at_utc=profile['issued_at_utc'] if profile and any(v is not None for v in hourly) else None,
                 full_forecast_energy_kwh=full,predicted_energy_kwh=prediction if full is not None else None,
-                actual_energy_kwh=actual['energy_kwh'],coverage_fraction=actual['coverage_fraction'],
-                eligible_fraction=actual['eligible_fraction'],curtailed_fraction=actual['curtailed_fraction'],
                 error_kwh=error,error_pct=error/prediction*100 if error is not None and prediction>0 else None,
-                comparable=comparable,hours=hours)
-            # Round transport values, not integrations or cached forecast identities.
-            day={k:round(v,6) if isinstance(v,float) else v for k,v in day.items()}
-            if now>=finish+dt.timedelta(minutes=3):
-                with self.connection:
-                    self.connection.execute('INSERT OR REPLACE INTO daily_comparisons VALUES (?,?,?)',(date.isoformat(),timezone,encode(day)))
-            report['days'].append(day);date+=dt.timedelta(days=1)
+                comparable=comparable,hourly_energy_kwh=hourly,compared_hours=len(pairs),
+                hourly_mae_kwh=sum(abs(e) for e in errors)/len(errors) if errors else None,
+                hourly_bias_kwh=sum(errors)/len(errors) if errors else None,
+                relative_mae_pct=sum(abs(e) for e in errors)/sum_prediction*100 if sum_prediction>0 else None)
+            horizons[str(lead)]={k:round(v,6) if isinstance(v,float) else v for k,v in meta.items()}
+        for row,prediction in zip(hours,horizons['1']['hourly_energy_kwh']):row[2]=prediction
+        base={k:v for k,v in horizons['1'].items() if k!='hourly_energy_kwh'}
+        day=dict(analysis_version=2,date_local=date.isoformat(),expected_hours=(finish-start).total_seconds()/3600,
+            elapsed_hours=(end-start).total_seconds()/3600,partial=end<finish,
+            actual_energy_kwh=actual['energy_kwh'],coverage_fraction=actual['coverage_fraction'],
+            eligible_fraction=actual['eligible_fraction'],curtailed_fraction=actual['curtailed_fraction'],
+            hours=hours,horizons=horizons,**base)
+        return {k:round(v,6) if isinstance(v,float) else v for k,v in day.items()}
+    def comparison_summary(self,now_utc,timezone,retention_days=400):
+        from solar_corrections import recommend
+        now=timestamp(now_utc);tz=ZoneInfo(timezone)
+        first,last=self.connection.execute('SELECT min(ts_utc),max(ts_utc) FROM observations').fetchone()
+        report=dict(schema_version=1,timezone=timezone,baseline_local_time='22:00',updated_at_utc=iso(now),
+            first_observation_utc=first,last_observation_utc=last,days=[],hour_detail_days=31)
+        today=now.astimezone(tz).date()
+        if first:
+            date=max(timestamp(first).astimezone(tz).date(),today-dt.timedelta(days=min(400,retention_days)-1))
+            while date<=today:
+                start,finish=day_bounds(date,tz)
+                if now.replace(second=0,microsecond=0)<=start:break
+                cached=self.connection.execute('SELECT payload FROM daily_comparisons WHERE date_local=? AND timezone=?',(date.isoformat(),timezone)).fetchone()
+                day=decode(cached[0]) if cached else None
+                if not day or day.get('analysis_version')!=2:
+                    day=self._comparison_day(date,now,tz)
+                    if now>=finish+dt.timedelta(minutes=3):
+                        with self.connection:self.connection.execute('INSERT OR REPLACE INTO daily_comparisons VALUES (?,?,?)',(date.isoformat(),timezone,encode(day)))
+                report['days'].append(day);date+=dt.timedelta(days=1)
+        report['recommendations']=recommend(report['days'])
+        # Full hourly detail remains in SQLite. Bound MQTT transport independently
+        # so three forecast horizons do not exceed the dashboard's 1 MiB limit.
+        for day in report['days']:
+            if dt.date.fromisoformat(day['date_local'])<today-dt.timedelta(days=30):
+                day['hours']=[]
+                for horizon in day['horizons'].values():horizon['hourly_energy_kwh']=[]
         return report
     def cleanup(self,now_utc,retention_days):
         cutoff=iso(timestamp(now_utc)-dt.timedelta(days=retention_days))

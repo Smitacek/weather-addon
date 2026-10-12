@@ -62,3 +62,26 @@ class DashboardTests(unittest.TestCase):
         client=TestClient(module.create_app(DataStore()))
         result=client.get('/api/comparison?period=day&date=2026-03-29').json()
         self.assertEqual(result['days'][0]['expected_hours'],23)
+
+    def test_remaining_today_curve_clips_current_interval_and_midnight(self):
+        import importlib.util
+        self.assertIsNotNone(importlib.util.find_spec('forecast_view'),'Remaining-day power curve is missing')
+        from forecast_view import remaining_today
+        profile={'timezone':'Europe/Prague','intervals':[
+            {'interval_start_utc':'2026-10-12T10:00Z','interval_end_utc':'2026-10-12T11:00Z','power_w':2000},
+            {'interval_start_utc':'2026-10-12T11:00Z','interval_end_utc':'2026-10-12T12:00Z','power_w':1000},
+            {'interval_start_utc':'2026-10-12T21:00Z','interval_end_utc':'2026-10-12T23:00Z','power_w':1000}]}
+        r=remaining_today(profile,dt.datetime(2026,10,12,10,30,tzinfo=UTC))
+        self.assertEqual(r['intervals'][0]['interval_start_utc'],'2026-10-12T10:30:00Z')
+        self.assertEqual(r['intervals'][-1]['interval_end_utc'],'2026-10-12T22:00:00Z')
+        self.assertIsNone(r['energy_kwh']) # provider gap is explicit
+        self.assertEqual(r['peak_power_w'],2000)
+
+    def test_lead_selector_uses_matching_baseline_not_d1_fallback(self):
+        store=DataStore();client=TestClient(module.create_app(store))
+        now=dt.datetime.now(UTC).isoformat()
+        day={'date_local':'2026-10-11','expected_hours':24,'elapsed_hours':24,'actual_energy_kwh':8,'predicted_energy_kwh':10,'error_kwh':-2,'error_pct':-20,'comparable':True,'coverage_fraction':1,'eligible_fraction':0,'curtailed_fraction':0,'hours':[], 'horizons':{'2':{'predicted_energy_kwh':20,'error_kwh':-12,'error_pct':-60,'comparable':True,'hourly_energy_kwh':[]}}}
+        self.assertTrue(store.update_solar('comparison',{'schema_version':1,'timezone':'Europe/Prague','updated_at_utc':now,'days':[day]}))
+        self.assertEqual(client.get('/api/comparison?date=2026-10-11&lead=2').json()['summary']['predicted_energy_kwh'],20)
+        self.assertIsNone(client.get('/api/comparison?date=2026-10-11&lead=3').json()['summary']['predicted_energy_kwh'])
+        self.assertEqual(client.get('/api/comparison?lead=4').status_code,400)

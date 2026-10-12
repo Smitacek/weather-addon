@@ -30,7 +30,7 @@ class ModelTests(unittest.TestCase):
         self.assertFalse(p['daily'][0]['complete'])
     def test_daily_sum_and_partial_hour(self):
         start=dt.datetime(2026,10,11,tzinfo=UTC)
-        p=build_profile(hours(start,96),ARRAYS,start+dt.timedelta(minutes=30),'UTC')
+        p=build_profile(hours(start,96),ARRAYS,start+dt.timedelta(minutes=30),'UTC',horizon_h=72)
         self.assertAlmostEqual(p['daily'][0]['remaining_energy_kwh'],141.47)
         self.assertAlmostEqual(p['daily'][1]['energy_kwh'],144.48)
         self.assertEqual(len(p['intervals']),73)

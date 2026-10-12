@@ -61,7 +61,7 @@ def day_bounds(day,tz):
     end = dt.datetime.combine(day+dt.timedelta(days=1),dt.time(),tzinfo=tz).astimezone(UTC)
     return start,end
 
-def build_profile(hourly,arrays,issued_at,timezone,horizon_h=72,conservative_factor=0.8):
+def build_profile(hourly,arrays,issued_at,timezone,horizon_h=96,conservative_factor=0.8):
     issued_at=timestamp(issued_at)
     tz=ZoneInfo(timezone)
     end=issued_at+dt.timedelta(hours=horizon_h)

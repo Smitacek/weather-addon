@@ -1,3 +1,10 @@
+# Weather and Dashboard 0.4.0 — 2026-10-12
+
+- Show interval-average expected DC power from now until local midnight, with remaining energy and the highest future hourly average. Missing intervals stay gaps; step segments preserve energy.
+- Compare D−1/D−2/D−3 previous-evening22:00 forecasts against the same measured local day and its hours. Default/deployed horizon96h covers the full third day.
+- Add hourly MAE/bias/sample counts and advisory correction factors, with conservative quality gating and evaluation on later, disjoint days. No automatic calibration or charging changes.
+- Preserve existing archived measurements and upgrade daily caches; retain400-day daily analysis and keep full hourly data in SQLite, limiting MQTT/UI hourly detail to31 days.
+
 # Weather and Dashboard 0.3.0 — 2026-10-12
 
 - Add Odhad vs. skutečnost panel with day, ISO week and calendar month navigation.

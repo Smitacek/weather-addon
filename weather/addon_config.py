@@ -41,7 +41,7 @@ class Config:
 
         # Horizons & cadence
         self.forecast_days = int(options.get("forecast_days", 7))
-        self.hourly_horizon_h = int(options.get("hourly_horizon_h", 72))
+        self.hourly_horizon_h = int(options.get("hourly_horizon_h", 96))
         self.nowcast_enabled = bool(options.get("nowcast_enabled", False))
         self.nowcast_step_s = int(options.get("nowcast_step_s", 900))
 

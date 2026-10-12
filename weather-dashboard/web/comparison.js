@@ -1,5 +1,5 @@
 'use strict';
-let comparisonData=null,comparisonPeriod='day',comparisonPage=false,comparisonRequest=0;
+let comparisonData=null,comparisonPeriod='day',comparisonPage=false,comparisonRequest=0,comparisonLead=1;
 function localToday(tz='Europe/Prague'){return dayKey(0,tz);}
 function comparisonMetric(id,value,unit){const el=$(id);el.replaceChildren(document.createTextNode(number(value,unit==='%'?1:2)+' '));const small=document.createElement('small');small.textContent=unit;el.append(small);}
 function comparisonState(day){
@@ -39,11 +39,17 @@ function renderComparison(){
  setText('comparison-quality',s.curtailed_fraction>0?'V části měření bylo označené možné nebo potvrzené omezení výroby. Tyto úseky se nepoužijí ke kalibraci.':'Bez potvrzených provozních limitů nelze z rozdílu určit příčinu nižší výroby.');
  $('comparison-rows').replaceChildren();r.days.forEach(day=>{const row=document.createElement('tr');const state=comparisonState(day);[day.date_local,number(day.predicted_energy_kwh,2),number(day.actual_energy_kwh,2),number(day.error_kwh,2),number(day.error_pct,1),number(day.coverage_fraction*100,1)+' %',state].forEach((value,index)=>{const cell=document.createElement('td');cell.textContent=value;if(index===6){cell.className='comparison-status'+(!day.comparable?' warn':'');if(day.issued_at_utc)cell.title='Předpověď vydaná '+new Intl.DateTimeFormat('cs-CZ',{timeZone:r.timezone,dateStyle:'short',timeStyle:'short'}).format(new Date(day.issued_at_utc));}row.append(cell);});$('comparison-rows').append(row);});
  setText('comparison-history',r.first_observation_utc?'Minutový archiv se sbírá od '+new Intl.DateTimeFormat('cs-CZ',{timeZone:r.timezone,dateStyle:'medium',timeStyle:'short'}).format(new Date(r.first_observation_utc))+'. Chybějící dny se nedopočítávají. Dnešek je porovnaný pouze do dosud změřeného času.':'Minutový archiv ještě neobsahuje měření.');
+ $('correction-rows').replaceChildren();for(const lead of ['1','2','3']){
+  const recommendation=r.recommendations?.[lead]||{};const stats=r.days.map(d=>d.horizons?.[lead]).filter(Boolean);const count=stats.reduce((sum,x)=>sum+(x.compared_hours||0),0);
+  const mean=key=>count?stats.reduce((sum,x)=>sum+(x[key]||0)*(x.compared_hours||0),0)/count:null;
+  const labels={insufficient_data:'Nedostatek vhodných dat',validated:'Ověřeno na pozdějších dnech',not_improved:'Korekce nezlepšila odhad',outside_limits:'Mimo povolený rozsah'};
+  const row=document.createElement('tr');['D−'+lead,String(count),number(mean('hourly_mae_kwh'),3),number(mean('hourly_bias_kwh'),3),String(recommendation.eligible_hours||0),number(recommendation.factor,3),labels[recommendation.status]||'Čekám na vyhodnocení'].forEach(t=>{const cell=document.createElement('td');cell.textContent=t;row.append(cell);});$('correction-rows').append(row);
+ }
  comparisonPlot();
 }
 async function refreshComparison(){
  if(!comparisonPage)return;const request=++comparisonRequest;
- try{const response=await fetch('api/comparison?'+new URLSearchParams({period:comparisonPeriod,date:$('compare-date').value}));if(!response.ok)throw Error();const result=await response.json();if(request!==comparisonRequest)return;comparisonData=result;$('comparison-error').hidden=true;renderComparison();}
+ try{const response=await fetch('api/comparison?'+new URLSearchParams({period:comparisonPeriod,date:$('compare-date').value,lead:String(comparisonLead)}));if(!response.ok)throw Error();const result=await response.json();if(request!==comparisonRequest)return;comparisonData=result;$('comparison-error').hidden=true;renderComparison();}
  catch(error){if(request!==comparisonRequest)return;$('comparison-error').hidden=false;setText('comparison-error','Porovnání se nepodařilo načíst. Zkontroluj běh Weather a MQTT.');}
 }
 for(const [id,view] of [['overview-page',false],['comparison-page',true]])$(id).addEventListener('click',()=>{comparisonPage=view;$('overview-view').hidden=view;$('comparison-view').hidden=!view;for(const [key,selected] of [['overview-page',!view],['comparison-page',view]]){$(key).classList.toggle('selected',selected);$(key).setAttribute('aria-pressed',String(selected));}if(view)refreshComparison();else render();});
@@ -51,3 +57,5 @@ $('compare-date').value=localToday();$('compare-date').addEventListener('change'
 for(const period of ['day','week','month'])$('compare-'+period).addEventListener('click',()=>{comparisonPeriod=period;for(const p of ['day','week','month']){$('compare-'+p).classList.toggle('selected',p===period);$('compare-'+p).setAttribute('aria-pressed',String(p===period));}refreshComparison();});
 function moveComparison(direction){const selected=new Date($('compare-date').value+'T12:00:00Z');if(!Number.isFinite(+selected))return;if(comparisonPeriod==='month'){selected.setUTCDate(1);selected.setUTCMonth(selected.getUTCMonth()+direction);}else selected.setUTCDate(selected.getUTCDate()+direction*(comparisonPeriod==='week'?7:1));$('compare-date').value=selected.toISOString().slice(0,10);refreshComparison();}
 $('compare-prev').addEventListener('click',()=>moveComparison(-1));$('compare-next').addEventListener('click',()=>moveComparison(1));$('compare-today').addEventListener('click',()=>{$('compare-date').value=localToday(comparisonData?.timezone);refreshComparison();});window.addEventListener('resize',comparisonPlot);setInterval(refreshComparison,30000);
+
+for(const lead of [1,2,3])$('lead-'+lead).addEventListener('click',()=>{comparisonLead=lead;for(const n of [1,2,3]){$('lead-'+n).classList.toggle('selected',n===lead);$('lead-'+n).setAttribute('aria-pressed',String(n===lead));}refreshComparison();});

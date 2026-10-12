@@ -1,5 +1,5 @@
 name: Weather Add-on
-version: 0.3.0
+version: 0.4.0
 slug: weather
 description: Weather and multi-plane PV forecasts with persistent forecast and telemetry
   archive
@@ -30,7 +30,7 @@ options:
   noct_cell_temp_c: 45.0
   inverter_ac_limit_kw: 3.0
   forecast_days: 7
-  hourly_horizon_h: 72
+  hourly_horizon_h: 96
   nowcast_enabled: false
   nowcast_step_s: 900
   update_interval: 300

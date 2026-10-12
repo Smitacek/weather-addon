@@ -82,6 +82,15 @@ class DataStore:
                     for key in ['actual_energy_kwh','predicted_energy_kwh','error_kwh']:
                         if day.get(key) is not None and not isinstance(day[key],(int,float)): return False
                     if not isinstance(day.get('hours'),list) or len(day['hours'])>25: return False
+                    if 'horizons' in day:
+                        if not isinstance(day['horizons'],dict) or any(k not in ('1','2','3') for k in day['horizons']):return False
+                        for horizon in day['horizons'].values():
+                            if not isinstance(horizon,dict):return False
+                            values=horizon.get('hourly_energy_kwh')
+                            if not isinstance(values,list) or len(values)!=len(day['hours']):return False
+                            if any(v is not None and (not isinstance(v,(int,float)) or v<0) for v in values):return False
+                            for k in ['predicted_energy_kwh','error_kwh','error_pct']:
+                                if horizon.get(k) is not None and not isinstance(horizon[k],(int,float)):return False
                     for hour in day['hours']:
                         if not isinstance(hour,list) or len(hour)!=6: return False
                         parse_time(hour[0])

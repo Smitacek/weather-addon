@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse,JSONResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 from mqtt_listener import DataStore,MQTTIngest,parse_time
+from forecast_view import remaining_today
 
 WEB_DIR=Path(__file__).with_name('web')
 
@@ -35,9 +36,11 @@ def create_app(store):
         try: observed_fresh=0<=(dt.datetime.now(dt.timezone.utc)-parse_time(observed['ts_utc'])).total_seconds()<=90
         except (KeyError,ValueError,TypeError): observed_fresh=False
         return JSONResponse(dict(profile=snap['solar'],health=snap['solar_health'],evaluation=snap['solar_evaluation'],
-            observed=observed,observed_series=snap['solar_observed_series'],observed_fresh=observed_fresh,valid=valid,age_s=age))
+            observed=observed,observed_series=snap['solar_observed_series'],observed_fresh=observed_fresh,valid=valid,age_s=age,
+            remaining_today=remaining_today(snap['solar'],dt.datetime.now(dt.timezone.utc)) if valid else {}))
     @app.get('/api/comparison')
-    async def comparison(period: str='day',date: str|None=None):
+    async def comparison(period: str='day',date: str|None=None,lead: int=1):
+        if lead not in (1,2,3):raise HTTPException(400,'Choose lead 1, 2 or 3')
         report=store.snapshot()['solar_comparison']
         timezone=report.get('timezone','Europe/Prague');tz=ZoneInfo(timezone)
         now=dt.datetime.now(dt.timezone.utc);today=now.astimezone(tz).date()
@@ -53,7 +56,16 @@ def create_app(store):
         source={r['date_local']:r for r in report.get('days',[])}
         while cursor<min(end,today+dt.timedelta(days=1)):
             row=source.get(cursor.isoformat())
-            if row: days.append(row)
+            if row:
+                selected_row={**row,'hours':[list(r) for r in row['hours']]}
+                if row.get('horizons') or lead!=1:
+                    horizon=row.get('horizons',{}).get(str(lead),{})
+                    for k in ['predicted_energy_kwh','full_forecast_energy_kwh','error_kwh','error_pct','issue_id','issued_at_utc','cutoff_utc']:
+                        selected_row[k]=horizon.get(k)
+                    selected_row['comparable']=horizon.get('comparable',False)
+                    predictions=horizon.get('hourly_energy_kwh',[])
+                    for i,hour in enumerate(selected_row['hours']):hour[2]=predictions[i] if i<len(predictions) else None
+                days.append(selected_row)
             else:
                 day_start=dt.datetime.combine(cursor,dt.time(),tz).astimezone(dt.timezone.utc)
                 day_end=dt.datetime.combine(cursor+dt.timedelta(days=1),dt.time(),tz).astimezone(dt.timezone.utc)
@@ -81,7 +93,7 @@ def create_app(store):
         try: fresh=0<=(now-parse_time(report['updated_at_utc'])).total_seconds()<=900
         except (KeyError,TypeError,ValueError): fresh=False
         return JSONResponse(dict(period=period,selected_date=selected.isoformat(),start_date=start.isoformat(),end_date=end.isoformat(),
-            timezone=timezone,baseline_local_time='22:00',fresh=fresh,updated_at_utc=report.get('updated_at_utc'),
+            timezone=timezone,lead=lead,recommendations=report.get('recommendations',{}),hour_detail_days=report.get('hour_detail_days',400),baseline_local_time='22:00',fresh=fresh,updated_at_utc=report.get('updated_at_utc'),
             first_observation_utc=report.get('first_observation_utc'),summary=summary,days=days))
     return app
 

@@ -21,7 +21,7 @@ COPY providers ./providers
 COPY compute.py .
 COPY mqtt_helper.py .
 COPY log_writer.py .
-COPY solar_model.py solar_archive.py solar_telemetry.py solar_service.py weather_publication.py VERSION ./
+COPY solar_model.py solar_archive.py solar_telemetry.py solar_service.py solar_corrections.py weather_publication.py VERSION ./
 RUN apk add --no-cache tzdata
 
 # Optional run script (not used by CMD, but available)
